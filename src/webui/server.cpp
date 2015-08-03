@@ -18,7 +18,7 @@
  *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
  *  MA  02110-1301  USA
  */
-#include "lws_config.h"
+#include <lws_config.h>
 
 #include <stdio.h>
 #include <string.h>
@@ -29,30 +29,67 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <assert.h>
-
-#ifdef _WIN32
-#include <io.h>
-#ifdef EXTERNAL_POLL
-#define poll WSAPoll
-#endif
-#else
 #include <syslog.h>
 #include <sys/time.h>
 #include <unistd.h>
-#endif
 
 #include <libwebsockets.h>
 
 static int close_testing;
 int max_poll_elements;
 
-#ifdef EXTERNAL_POLL
-struct pollfd *pollfds;
-int *fd_lookup;
-int count_pollfds;
-#endif
 static volatile int force_exit = 0;
 static struct libwebsocket_context *context;
+
+void request_transmit();
+
+struct keggy_status_t {
+	int controller_id;
+	char mode;
+	double lat;
+	double lng;
+	double target_lat;
+	double target_lng;
+	double vl;
+	double vr;
+};
+
+keggy_status_t keggy_status;
+
+void handle(int cid, const char *msg) {
+	double d1, d2;
+	if (*msg == 'S') {
+		keggy_status.controller_id = cid;
+		keggy_status.mode = 'S';
+		keggy_status.vl = keggy_status.vr = 0;
+		printf("RX c%d STOP\n", cid);
+	}
+	else if (*msg == 'F' && sscanf(msg, "F:%lf:%lf", &d1, &d2) == 2) {
+		keggy_status.controller_id = cid;
+		keggy_status.mode = 'F';
+		keggy_status.vl = keggy_status.vr = 0;
+		keggy_status.target_lat = d1;
+		keggy_status.target_lng = d2;
+		printf("RX c%d FOLLOW %2.5lf, %2.5lf\n", cid, d1, d2);
+	}
+	else if (*msg == 'C' && sscanf(msg, "C:%lf:%lf", &d1, &d2) == 2) {
+		keggy_status.controller_id = cid;
+		keggy_status.mode = 'C';
+		keggy_status.vl = d1;
+		keggy_status.vr = d2;
+		printf("RX c%d CONTROL %1.3lf, %1.3lf\n", cid, d1, d2);
+	}
+	else {
+		printf( "RX c%d BADMSG [%s]\n", cid, msg);
+	}
+}
+
+size_t format_status(int cid, char *buf) {
+	return sprintf(buf, "{\"active\":%d, \"mode\":\"%c\", \"vl\": %2.5lf, \"vr\": %2.5lf, \"dest\": [%1.7lf, %1.7lf]}", 
+		cid == keggy_status.controller_id, keggy_status.mode,
+		keggy_status.vl, keggy_status.vr,
+		keggy_status.target_lat, keggy_status.target_lng);
+}
 
 /*
  * This demo server shows how to use libwebsockets for one or more
@@ -70,18 +107,13 @@ static struct libwebsocket_context *context;
  */
 
 enum demo_protocols {
-	/* always first */
 	PROTOCOL_HTTP = 0,
-
 	PROTOCOL_DUMB_INCREMENT,
-	PROTOCOL_LWS_MIRROR,
-
-	/* always last */
 	DEMO_PROTOCOL_COUNT
 };
 
 
-#define LOCAL_RESOURCE_PATH "data"
+#define LOCAL_RESOURCE_PATH "src/webui/assets"
 const char *resource_path = LOCAL_RESOURCE_PATH;
 
 /*
@@ -96,38 +128,6 @@ struct serveable {
 struct per_session_data__http {
 	int fd;
 };
-
-/*
- * this is just an example of parsing handshake headers, you don't need this
- * in your code unless you will filter allowing connections by the header
- * content
- */
-
-// static void
-// dump_handshake_info(struct libwebsocket *wsi)
-// {
-// 	int n = 0;
-// 	char buf[256];
-// 	const unsigned char *c;
-
-// 	do {
-// 		c = lws_token_to_string(n);
-// 		if (!c) {
-// 			n++;
-// 			continue;
-// 		}
-
-// 		if (!lws_hdr_total_length(wsi, n)) {
-// 			n++;
-// 			continue;
-// 		}
-
-// 		lws_hdr_copy(wsi, buf, sizeof buf, n);
-
-// 		fprintf(stderr, "    %s = %s\n", (char *)c, buf);
-// 		n++;
-// 	} while (c);
-// }
 
 const char * get_mimetype(const char *file)
 {
@@ -279,7 +279,7 @@ static int callback_http(struct libwebsocket_context *context,
 				strcat(buf, "/");
 			strncat(buf, in, sizeof(buf) - strlen(resource_path));
 		} else /* default file to serve */
-			strcat(buf, "/test.html");
+			strcat(buf, "/index.html");
 		buf[sizeof(buf) - 1] = '\0';
 
 		/* refuse to serve files we don't understand */
@@ -439,54 +439,6 @@ bail:
 		/* if we returned non-zero from here, we kill the connection */
 		break;
 
-#ifdef EXTERNAL_POLL
-	/*
-	 * callbacks for managing the external poll() array appear in
-	 * protocol 0 callback
-	 */
-
-	case LWS_CALLBACK_LOCK_POLL:
-		/*
-		 * lock mutex to protect pollfd state
-		 * called before any other POLL related callback
-		 */
-		break;
-
-	case LWS_CALLBACK_UNLOCK_POLL:
-		/*
-		 * unlock mutex to protect pollfd state when
-		 * called after any other POLL related callback
-		 */
-		break;
-
-	case LWS_CALLBACK_ADD_POLL_FD:
-
-		if (count_pollfds >= max_poll_elements) {
-			lwsl_err("LWS_CALLBACK_ADD_POLL_FD: too many sockets to track\n");
-			return 1;
-		}
-
-		fd_lookup[pa->fd] = count_pollfds;
-		pollfds[count_pollfds].fd = pa->fd;
-		pollfds[count_pollfds].events = pa->events;
-		pollfds[count_pollfds++].revents = 0;
-		break;
-
-	case LWS_CALLBACK_DEL_POLL_FD:
-		if (!--count_pollfds)
-			break;
-		m = fd_lookup[pa->fd];
-		/* have the last guy take up the vacant slot */
-		pollfds[m] = pollfds[count_pollfds];
-		fd_lookup[pollfds[count_pollfds].fd] = m;
-		break;
-
-	case LWS_CALLBACK_CHANGE_MODE_POLL_FD:
-	        pollfds[fd_lookup[pa->fd]].events = pa->events;
-		break;
-
-#endif
-
 	case LWS_CALLBACK_GET_THREAD_ID:
 		/*
 		 * if you will call "libwebsocket_callback_on_writable"
@@ -513,220 +465,55 @@ try_to_reuse:
 }
 
 
-/* dumb_increment protocol */
-
-/*
- * one of these is auto-created for each connection and a pointer to the
- * appropriate instance is passed to the callback in the user parameter
- *
- * for this example protocol we use it to individualize the count for each
- * connection.
- */
+static int next_client_id = 1;
 
 struct per_session_data__dumb_increment {
-	int number;
+	int client_id;
 };
 
 static int
 callback_dumb_increment(struct libwebsocket_context *context,
 			struct libwebsocket *wsi,
 			enum libwebsocket_callback_reasons reason,
-					       void *user, void *in, size_t len)
+					       void *userdata, void *in, size_t len)
 {
 	int n, m;
-	unsigned char buf[LWS_SEND_BUFFER_PRE_PADDING + 512 +
+	unsigned char buf[LWS_SEND_BUFFER_PRE_PADDING + 1024 +
 						  LWS_SEND_BUFFER_POST_PADDING];
 	unsigned char *p = &buf[LWS_SEND_BUFFER_PRE_PADDING];
-	struct per_session_data__dumb_increment *pss = (struct per_session_data__dumb_increment *)user;
+	struct per_session_data__dumb_increment *pss = (struct per_session_data__dumb_increment *)userdata;
 
 	switch (reason) {
 
-	case LWS_CALLBACK_ESTABLISHED:
-		lwsl_info("callback_dumb_increment: "
-						 "LWS_CALLBACK_ESTABLISHED\n");
-		pss->number = 0;
-		break;
-
-	case LWS_CALLBACK_SERVER_WRITEABLE:
-		n = sprintf((char *)p, "%d", pss->number++);
-		m = libwebsocket_write(wsi, p, n, LWS_WRITE_TEXT);
-		if (m < n) {
-			lwsl_err("ERROR %d writing to di socket\n", n);
-			return -1;
-		}
-		if (close_testing && pss->number == 50) {
-			lwsl_info("close tesing limit, closing\n");
-			return -1;
-		}
-		break;
-
-	case LWS_CALLBACK_RECEIVE:
-//		fprintf(stderr, "rx %d\n", (int)len);
-		if (len < 6)
+		case LWS_CALLBACK_ESTABLISHED:
+			pss->client_id = next_client_id++;
+			printf("RX c%d CONNECT\n", pss->client_id);
+			request_transmit();	
 			break;
-		if (strcmp((const char *)in, "reset\n") == 0)
-			pss->number = 0;
-		break;
-	/*
-	 * this just demonstrates how to use the protocol filter. If you won't
-	 * study and reject connections based on header content, you don't need
-	 * to handle this callback
-	 */
 
-	case LWS_CALLBACK_FILTER_PROTOCOL_CONNECTION:
-		//dump_handshake_info(wsi);
-		/* you could return non-zero here and kill the connection */
-		break;
-
-	default:
-		break;
-	}
-
-	return 0;
-}
-
-
-/* lws-mirror_protocol */
-
-#define MAX_MESSAGE_QUEUE 32
-
-struct per_session_data__lws_mirror {
-	struct libwebsocket *wsi;
-	int ringbuffer_tail;
-};
-
-struct a_message {
-	void *payload;
-	size_t len;
-};
-
-static struct a_message ringbuffer[MAX_MESSAGE_QUEUE];
-static int ringbuffer_head;
-
-static int
-callback_lws_mirror(struct libwebsocket_context *context,
-			struct libwebsocket *wsi,
-			enum libwebsocket_callback_reasons reason,
-					       void *user, void *in, size_t len)
-{
-	int n;
-	struct per_session_data__lws_mirror *pss = (struct per_session_data__lws_mirror *)user;
-
-	switch (reason) {
-
-	case LWS_CALLBACK_ESTABLISHED:
-		lwsl_info("callback_lws_mirror: LWS_CALLBACK_ESTABLISHED\n");
-		pss->ringbuffer_tail = ringbuffer_head;
-		pss->wsi = wsi;
-		break;
-
-	case LWS_CALLBACK_PROTOCOL_DESTROY:
-		lwsl_notice("mirror protocol cleaning up\n");
-		for (n = 0; n < sizeof ringbuffer / sizeof ringbuffer[0]; n++)
-			if (ringbuffer[n].payload)
-				free(ringbuffer[n].payload);
-		break;
-
-	case LWS_CALLBACK_SERVER_WRITEABLE:
-		if (close_testing)
-			break;
-		while (pss->ringbuffer_tail != ringbuffer_head) {
-
-			n = libwebsocket_write(wsi, (unsigned char *)
-				   ringbuffer[pss->ringbuffer_tail].payload +
-				   LWS_SEND_BUFFER_PRE_PADDING,
-				   ringbuffer[pss->ringbuffer_tail].len,
-								LWS_WRITE_TEXT);
-			if (n < 0) {
-				lwsl_err("ERROR %d writing to mirror socket\n", n);
+		case LWS_CALLBACK_SERVER_WRITEABLE:
+			n = format_status(pss->client_id, (char *)p);
+			m = libwebsocket_write(wsi, p, n, LWS_WRITE_TEXT);
+			if (m < n) {
+				lwsl_err("ERROR %d writing to di socket\n", n);
 				return -1;
 			}
-			if (n < ringbuffer[pss->ringbuffer_tail].len)
-				lwsl_err("mirror partial write %d vs %d\n",
-				       n, ringbuffer[pss->ringbuffer_tail].len);
-
-			if (pss->ringbuffer_tail == (MAX_MESSAGE_QUEUE - 1))
-				pss->ringbuffer_tail = 0;
-			else
-				pss->ringbuffer_tail++;
-
-			if (((ringbuffer_head - pss->ringbuffer_tail) &
-				  (MAX_MESSAGE_QUEUE - 1)) == (MAX_MESSAGE_QUEUE - 15))
-				libwebsocket_rx_flow_allow_all_protocol(
-					       libwebsockets_get_protocol(wsi));
-
-			// lwsl_debug("tx fifo %d\n", (ringbuffer_head - pss->ringbuffer_tail) & (MAX_MESSAGE_QUEUE - 1));
-
-			if (lws_partial_buffered(wsi) || lws_send_pipe_choked(wsi)) {
-				libwebsocket_callback_on_writable(context, wsi);
-				break;
+			else {
+				printf("TX c%d %s\n", pss->client_id, (char*)p);
 			}
-			/*
-			 * for tests with chrome on same machine as client and
-			 * server, this is needed to stop chrome choking
-			 */
-#ifdef _WIN32
-			Sleep(1);
-#else
-			usleep(1);
-#endif
-		}
-		break;
+			break;
 
-	case LWS_CALLBACK_RECEIVE:
+		case LWS_CALLBACK_RECEIVE:
+			handle(pss->client_id, (const char*)in);
+			request_transmit();	
+			break;
 
-		if (((ringbuffer_head - pss->ringbuffer_tail) &
-				  (MAX_MESSAGE_QUEUE - 1)) == (MAX_MESSAGE_QUEUE - 1)) {
-			lwsl_err("dropping!\n");
-			goto choke;
-		}
-
-		if (ringbuffer[ringbuffer_head].payload)
-			free(ringbuffer[ringbuffer_head].payload);
-
-		ringbuffer[ringbuffer_head].payload =
-				malloc(LWS_SEND_BUFFER_PRE_PADDING + len +
-						  LWS_SEND_BUFFER_POST_PADDING);
-		ringbuffer[ringbuffer_head].len = len;
-		memcpy((char *)ringbuffer[ringbuffer_head].payload +
-					  LWS_SEND_BUFFER_PRE_PADDING, in, len);
-		if (ringbuffer_head == (MAX_MESSAGE_QUEUE - 1))
-			ringbuffer_head = 0;
-		else
-			ringbuffer_head++;
-
-		if (((ringbuffer_head - pss->ringbuffer_tail) &
-				  (MAX_MESSAGE_QUEUE - 1)) != (MAX_MESSAGE_QUEUE - 2))
-			goto done;
-
-choke:
-		lwsl_debug("LWS_CALLBACK_RECEIVE: throttling %p\n", wsi);
-		libwebsocket_rx_flow_control(wsi, 0);
-
-//		lwsl_debug("rx fifo %d\n", (ringbuffer_head - pss->ringbuffer_tail) & (MAX_MESSAGE_QUEUE - 1));
-done:
-		libwebsocket_callback_on_writable_all_protocol(
-					       libwebsockets_get_protocol(wsi));
-		break;
-
-	/*
-	 * this just demonstrates how to use the protocol filter. If you won't
-	 * study and reject connections based on header content, you don't need
-	 * to handle this callback
-	 */
-
-	case LWS_CALLBACK_FILTER_PROTOCOL_CONNECTION:
-		//dump_handshake_info(wsi);
-		/* you could return non-zero here and kill the connection */
-		break;
-
-	default:
-		break;
+		default:
+			break;
 	}
 
 	return 0;
 }
-
 
 /* list of supported protocols and callbacks */
 
@@ -734,25 +521,23 @@ static struct libwebsocket_protocols protocols[] = {
 	/* first protocol must always be HTTP handler */
 
 	{
-		"http-only",		/* name */
+		"http",		/* name */
 		callback_http,		/* callback */
 		sizeof (struct per_session_data__http),	/* per_session_data_size */
 		0,			/* max frame size / rx buffer */
 	},
 	{
-		"dumb-increment-protocol",
+		"keggyctl",
 		callback_dumb_increment,
 		sizeof(struct per_session_data__dumb_increment),
-		10,
-	},
-	{
-		"lws-mirror-protocol",
-		callback_lws_mirror,
-		sizeof(struct per_session_data__lws_mirror),
-		128,
+		0,
 	},
 	{ NULL, NULL, 0, 0 } /* terminator */
 };
+
+void request_transmit() {
+	libwebsocket_callback_on_writable_all_protocol(&protocols[PROTOCOL_DUMB_INCREMENT]);
+}
 
 void sighandler(int sig)
 {
@@ -769,9 +554,6 @@ static struct option options[] = {
 	{ "interface",  required_argument,	NULL, 'i' },
 	{ "closetest",  no_argument,		NULL, 'c' },
 	{ "libev",  no_argument,		NULL, 'e' },
-	#ifndef LWS_NO_DAEMONIZE
-	{ "daemonize", 	no_argument,		NULL, 'D' },
-#endif
 	{ "resource_path", required_argument,		NULL, 'r' },
 	{ NULL, 0, 0, 0 }
 };
@@ -785,19 +567,18 @@ int main(int argc, char **argv)
 	int opts = 0;
 	char interface_name[128] = "";
 	const char *iface = NULL;
-#ifndef WIN32
 	int syslog_options = LOG_PID | LOG_PERROR;
-#endif
 	unsigned int ms, oldms = 0;
 	struct lws_context_creation_info info;
 
 	int debug_level = 7;
-#ifndef LWS_NO_DAEMONIZE
-	int daemonize = 0;
-#endif
 
 	memset(&info, 0, sizeof info);
 	info.port = 8080;
+
+	memset(&keggy_status, 0, sizeof keggy_status);
+	keggy_status.controller_id = -1;
+	keggy_status.mode = 'S';
 
 	while (n >= 0) {
 		n = getopt_long(argc, argv, "eci:hsap:d:Dr:", options, NULL);
@@ -807,14 +588,6 @@ int main(int argc, char **argv)
 		case 'e':
 			opts |= LWS_SERVER_OPTION_LIBEV;
 			break;
-#ifndef LWS_NO_DAEMONIZE
-		case 'D':
-			daemonize = 1;
-			#ifndef WIN32
-			syslog_options &= ~LOG_PERROR;
-			#endif
-			break;
-#endif
 		case 'd':
 			debug_level = atoi(optarg);
 			break;
@@ -851,25 +624,11 @@ int main(int argc, char **argv)
 		}
 	}
 
-#if !defined(LWS_NO_DAEMONIZE) && !defined(WIN32)
-	/* 
-	 * normally lock path would be /var/lock/lwsts or similar, to
-	 * simplify getting started without having to take care about
-	 * permissions or running as root, set to /tmp/.lwsts-lock
-	 */
-	if (daemonize && lws_daemonize("/tmp/.lwsts-lock")) {
-		fprintf(stderr, "Failed to daemonize\n");
-		return 1;
-	}
-#endif
-
 	signal(SIGINT, sighandler);
 
-#ifndef WIN32
 	/* we will only try to log things according to our debug_level */
 	setlogmask(LOG_UPTO (LOG_DEBUG));
 	openlog("lwsts", syslog_options, LOG_DAEMON);
-#endif
 
 	/* tell the library what debug level to emit and to send it to syslog */
 	lws_set_log_level(debug_level, lwsl_emit_syslog);
@@ -879,21 +638,9 @@ int main(int argc, char **argv)
 						    "licensed under LGPL2.1\n");
 
 	printf("Using resource path \"%s\"\n", resource_path);
-#ifdef EXTERNAL_POLL
-	max_poll_elements = getdtablesize();
-	pollfds = malloc(max_poll_elements * sizeof (struct pollfd));
-	fd_lookup = malloc(max_poll_elements * sizeof (int));
-	if (pollfds == NULL || fd_lookup == NULL) {
-		lwsl_err("Out of memory pollfds=%d\n", max_poll_elements);
-		return -1;
-	}
-#endif
 
 	info.iface = iface;
 	info.protocols = protocols;
-#ifndef LWS_NO_EXTENSIONS
-	info.extensions = libwebsocket_get_internal_extensions();
-#endif
 	if (!use_ssl) {
 		info.ssl_cert_filepath = NULL;
 		info.ssl_private_key_filepath = NULL;
@@ -926,70 +673,29 @@ int main(int argc, char **argv)
 
 	n = 0;
 	while (n >= 0 && !force_exit) {
-		struct timeval tv;
+		// struct timeval tv;
 
-		gettimeofday(&tv, NULL);
+		// gettimeofday(&tv, NULL);
 
-		/*
-		 * This provokes the LWS_CALLBACK_SERVER_WRITEABLE for every
-		 * live websocket connection using the DUMB_INCREMENT protocol,
-		 * as soon as it can take more packets (usually immediately)
-		 */
+		
+		//  * This provokes the LWS_CALLBACK_SERVER_WRITEABLE for every
+		//  * live websocket connection using the DUMB_INCREMENT protocol,
+		//  * as soon as it can take more packets (usually immediately)
+		 
 
-		ms = (tv.tv_sec * 1000) + (tv.tv_usec / 1000);
-		if ((ms - oldms) > 50) {
-			libwebsocket_callback_on_writable_all_protocol(&protocols[PROTOCOL_DUMB_INCREMENT]);
-			oldms = ms;
-		}
-
-#ifdef EXTERNAL_POLL
-
-		/*
-		 * this represents an existing server's single poll action
-		 * which also includes libwebsocket sockets
-		 */
-
-		n = poll(pollfds, count_pollfds, 50);
-		if (n < 0)
-			continue;
-
-
-		if (n)
-			for (n = 0; n < count_pollfds; n++)
-				if (pollfds[n].revents)
-					/*
-					* returns immediately if the fd does not
-					* match anything under libwebsockets
-					* control
-					*/
-					if (libwebsocket_service_fd(context,
-								  &pollfds[n]) < 0)
-						goto done;
-#else
-		/*
-		 * If libwebsockets sockets are all we care about,
-		 * you can use this api which takes care of the poll()
-		 * and looping through finding who needed service.
-		 *
-		 * If no socket needs service, it'll return anyway after
-		 * the number of ms in the second argument.
-		 */
+		// ms = (tv.tv_sec * 1000) + (tv.tv_usec / 1000);
+		// if ((ms - oldms) > 50) {
+		// 	libwebsocket_callback_on_writable_all_protocol(&protocols[PROTOCOL_DUMB_INCREMENT]);
+		// 	oldms = ms;
+		// }
 
 		n = libwebsocket_service(context, 50);
-#endif
 	}
-
-#ifdef EXTERNAL_POLL
-done:
-#endif
 
 	libwebsocket_context_destroy(context);
 
 	lwsl_notice("libwebsockets-test-server exited cleanly\n");
 
-#ifndef WIN32
 	closelog();
-#endif
-
 	return 0;
 }

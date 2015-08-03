@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Keggy Controller</title>
+    <meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <style>
+        #status {
+            position: absolute;
+            left: 0px;
+            top: 0px;
+            right: 0px;
+            bottom: 120px;
+            background: #fff;
+            text-align: center;
+            padding: 40px;
+        }
+        #controls {
+            position: absolute;
+            left: 0px;
+            height: 120px;
+            right: 0px;
+            bottom: 0px;
+            background: #fff;
+        	text-align: center;
+        }
+
+        #controls circle {
+			fill: #ccc;
+            fill-opacity: 0;
+			stroke: #222;
+			stroke-width: 2px;
+        }
+
+        #controls .active circle {
+            fill-opacity: 1;
+        }
+
+        #controls text {
+			fill: #222;
+			stroke-width: 0px;
+			font-family: Helvetica;
+			font-size: 10px;
+			font-weight: bold;
+			text-anchor: middle;
+        }
+    </style>
+</head>
+<body>
+
+<div id="status">Disconnected</div>
+<div id="controls">
+    <svg xmlns="http://www.w3.org/2000/svg" width="300" height="100">
+    	<g id="follow-btn" cursor="pointer" onclick="setMode('F')">
+  			<circle id="follow-btn" cx="50" cy="50" r="35" />
+  			<text x="50" y="56">FOLLOW</text>
+  		</g>
+    	<g id="stop-btn" cursor="pointer" onclick="setMode('S')">
+  			<circle cx="150" cy="50" r="45"/>
+  			<text x="150" y="56">STOP</text>
+  		</g>
+    	<g id="control-btn" cursor="pointer" onclick="setMode('C')">
+  			<circle cx="250" cy="50" r="35"/>
+  			<text x="250" y="56">CONTROL</text>
+  		</g>
+    </svg>	
+</div>
+
+<script>	
+	var sock = null, 
+		mode = 'S',
+        modeNames = {S: 'stop', F: 'follow', C: 'control'},
+		controlAcceleration = 0,
+		controlDirection = 0,
+		followLat = 0, 
+		followLng = 0, 
+		followAccuracy = 1E9, 
+		followTs = 0,
+        keggyStatus = null;
+	
+	var connect = function() {
+		var l = window.location,
+			wsurl = ((l.protocol === "https:") ? "wss://" : "ws://") + l.hostname + (((l.port != 80) && (l.port != 443)) ? ":" + l.port : "") + l.pathname;
+        try {
+            sock = new WebSocket(wsurl, "keggyctl");
+            sock.onopen = function() {
+                render();
+            };
+            sock.onmessage =function(msg) {
+                data = JSON.parse(msg.data);
+                console.log(data);
+                keggyStatus = data;
+                render();
+            }; 
+            sock.onclose = function() {
+                sock = null;
+                keggyStatus = null;
+                render();
+                //setInterval(connect, 2000);
+            };            
+        }
+        catch(err) {
+            console.log(err);
+            //setInterval(connect, 2000);
+        }
+	};
+
+	var render = function() {
+        // set button state
+        var mode = keggyStatus && keggyStatus.active ? keggyStatus.mode : null;
+        var activeButtonId = modeNames[mode] + '-btn';
+        var buttons = ['follow-btn', 'stop-btn', 'control-btn'];
+        for(var i=0; i<buttons.length; i++) {
+            var buttonId = buttons[i];
+            document.getElementById(buttonId).setAttribute('class',  
+                buttonId == activeButtonId ? 'active' : null);
+        }
+
+        // set status string
+        var html = '';
+        if (!keggyStatus) {
+            html = 'DISCONNECTED';
+        }
+        else {
+            html += (keggyStatus.active ? 'You have control' : 'Someone else has control');
+            html += '<br>';
+            html += 'Mode: ' + modeNames[keggyStatus.mode];
+            html += '<br>';
+            html += 'VL: ' + keggyStatus.vl.toFixed(3) + ', VR: ' + keggyStatus.vr.toFixed(3);
+            if (keggyStatus.mode == 'F') {
+                html += '<br>';
+                html += 'Destination: ' + keggyStatus.dest[1].toFixed(5) + ', ' + keggyStatus.dest[0].toFixed(5);
+            }
+
+        }
+		document.getElementById('status').innerHTML = html;
+	};
+
+	var transmit = function() {
+		if (sock) {
+            var msg;
+            if (mode == 'F') {
+                msg = [mode, followLat, followLng].join(':');
+            }
+            else if (mode == 'C') {
+                msg = [mode, controlAcceleration, controlDirection].join(':');
+            }
+            else {
+                msg = [mode].join(':');
+            }
+			console.log('TX', msg);
+			sock.send(msg);
+		}
+	};
+
+	var setMode = function(m) {
+		mode = m;
+		transmit();
+	};
+
+    if (navigator.geolocation) {
+        console.log( "Location services available");
+        var onPositionUpdate = function(pos) {
+            followTs = pos.timestamp/1000;
+            followLat = pos.coords.latitude;
+            followLng = pos.coords.longitude;
+            followAccuracy = pos.coords.accuracy;
+            if (mode == 'F') {
+	            transmit();
+            }
+        }
+        var onPositionError = function(err) {
+            console.warn('Location error %d: %s', err.code, err.message);
+            followTs = 0;
+            followLat = 0;
+            followLng = 0;
+            followAccuracy = 1E9;
+        }
+        navigator.geolocation.watchPosition(onPositionUpdate,onPositionError,{
+            enableHighAccuracy: true,
+            maximumAge: 10000
+        });
+    }
+
+    window.addEventListener('deviceorientation', function(e) {
+    	function norm(val, min, max, center) {
+    		val -= center;
+    		var aval = Math.abs(val);
+    		if (aval < min) {
+    			return 0;
+    		}
+    		else if (aval > max) {
+    			return Math.round(val/aval);
+    		}
+			return Math.round(100*val/max)/100;
+    	}
+    	controlAcceleration = -norm(e.beta, 10, 30, 45);
+    	controlDirection = norm(e.gamma, 10, 30, 0);
+    	if (mode == 'C') {
+    		transmit();
+    	}
+    }, false);
+    connect();
+
+</script>
+
+</body>
+</html>
