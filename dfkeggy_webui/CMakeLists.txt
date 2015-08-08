@@ -167,4 +167,4 @@ include_directories(include ${catkin_INCLUDE_DIRS})
 
 add_executable(dfkeggy_webui src/server.cpp)
 target_link_libraries(dfkeggy_webui ${catkin_LIBRARIES} websockets)
-#add_dependencies(dfkeggy_webui dfkeggy_webui_generate_messages_cpp) 
+add_dependencies(dfkeggy_webui dfkeggy_webui_generate_messages_cpp) 
