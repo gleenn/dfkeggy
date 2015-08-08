@@ -1,25 +1,20 @@
 .PHONY: all clean install run
 
-all: bin/dfkeggy
+all: run
 
-run: all
-	bin/dfkeggy
+run: build/devel/lib/dfkeggy_webui/dfkeggy_webui 
+	build/devel/lib/dfkeggy_webui/dfkeggy_webui
 
-bin/dfkeggy: src/webui/server.cpp 
-	mkdir -p bin
-	c++ -I/usr/local/include src/webui/server.cpp -L /usr/local/lib -l websockets -o bin/dfkeggy
+build/devel/lib/dfkeggy_webui/dfkeggy_webui: dfkeggy_webui/src/server.cpp 
+	mkdir -p build
+	cd build && cmake ../dfkeggy_webui && make
 	# xxd -i www/index.html > 
 
-# install: env
-# 	sudo python setup.py install
-
 clean:
-	rm -rf bin
-	# find . -name '*.pyc' -exec rm -f {} +
-	# find . -name '*.pyo' -exec rm -f {} +
-	# find . -name '*~' -exec rm -f {} +
-	# rm -rf dfaprs.egg-info
-	# rm -rf build
-	# rm -rf env
+	rm -rf build
 
+rosws:
+	mkdir -p build
+	cd build/src/dfkeggy; ln -s ../../../src
+	cd build; catkin_init_workspace
 

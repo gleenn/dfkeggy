@@ -19,7 +19,6 @@
  *  MA  02110-1301  USA
  */
 #include <lws_config.h>
-
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -32,8 +31,13 @@
 #include <syslog.h>
 #include <sys/time.h>
 #include <unistd.h>
-
+#include <sstream>
 #include <libwebsockets.h>
+#include "ros/ros.h"
+#include "std_msgs/String.h"
+#include "dfkeggy_webui/WebUI.h"
+
+ros::Publisher *pub = NULL;
 
 static int close_testing;
 int max_poll_elements;
@@ -57,11 +61,13 @@ struct keggy_status_t {
 keggy_status_t keggy_status;
 
 void handle(int cid, const char *msg) {
+	dfkeggy_webui::WebUI rosmsg;
 	double d1, d2;
 	if (*msg == 'S') {
 		keggy_status.controller_id = cid;
 		keggy_status.mode = 'S';
 		keggy_status.vl = keggy_status.vr = 0;
+		rosmsg.mode = 'S';
 		printf("RX c%d STOP\n", cid);
 	}
 	else if (*msg == 'F' && sscanf(msg, "F:%lf:%lf", &d1, &d2) == 2) {
@@ -70,6 +76,9 @@ void handle(int cid, const char *msg) {
 		keggy_status.vl = keggy_status.vr = 0;
 		keggy_status.target_lat = d1;
 		keggy_status.target_lng = d2;
+		rosmsg.mode = 'F';
+		rosmsg.target_lat = d1;
+		rosmsg.target_lng = d2;
 		printf("RX c%d FOLLOW %2.5lf, %2.5lf\n", cid, d1, d2);
 	}
 	else if (*msg == 'C' && sscanf(msg, "C:%lf:%lf", &d1, &d2) == 2) {
@@ -77,10 +86,17 @@ void handle(int cid, const char *msg) {
 		keggy_status.mode = 'C';
 		keggy_status.vl = d1;
 		keggy_status.vr = d2;
+		rosmsg.mode = 'C';
+		rosmsg.accel = d1;
+		rosmsg.turn = d2;
 		printf("RX c%d CONTROL %1.3lf, %1.3lf\n", cid, d1, d2);
 	}
 	else {
 		printf( "RX c%d BADMSG [%s]\n", cid, msg);
+	}
+
+	if (pub) {
+		pub->publish(rosmsg);
 	}
 }
 
@@ -113,7 +129,7 @@ enum demo_protocols {
 };
 
 
-#define LOCAL_RESOURCE_PATH "src/webui/assets"
+#define LOCAL_RESOURCE_PATH "dfkeggy_webui/www"
 const char *resource_path = LOCAL_RESOURCE_PATH;
 
 /*
@@ -671,25 +687,15 @@ int main(int argc, char **argv)
 		return -1;
 	}
 
+    ros::init(argc, argv, "dfkeggy_webui");
+    ros::NodeHandle ros_node;
+    ros::Publisher  webui_pub = ros_node.advertise<dfkeggy_webui::WebUI>("webui", 1000);
+    pub = &webui_pub;
+    
 	n = 0;
-	while (n >= 0 && !force_exit) {
-		// struct timeval tv;
-
-		// gettimeofday(&tv, NULL);
-
-		
-		//  * This provokes the LWS_CALLBACK_SERVER_WRITEABLE for every
-		//  * live websocket connection using the DUMB_INCREMENT protocol,
-		//  * as soon as it can take more packets (usually immediately)
-		 
-
-		// ms = (tv.tv_sec * 1000) + (tv.tv_usec / 1000);
-		// if ((ms - oldms) > 50) {
-		// 	libwebsocket_callback_on_writable_all_protocol(&protocols[PROTOCOL_DUMB_INCREMENT]);
-		// 	oldms = ms;
-		// }
-
+	while (n >= 0 && ros::ok() && !force_exit) {
 		n = libwebsocket_service(context, 50);
+	    ros::spinOnce();
 	}
 
 	libwebsocket_context_destroy(context);
