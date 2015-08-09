@@ -21,6 +21,10 @@ Installation (Ubuntu)
     cd dfkeggy
     make
 
+To see ROS messages (e.g. for webui topic):
+
+	rostopic echo /webui
+
 
 Installation (OSX)
 -------------------

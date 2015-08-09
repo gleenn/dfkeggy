@@ -590,7 +590,7 @@ int main(int argc, char **argv)
 	int debug_level = 7;
 
 	memset(&info, 0, sizeof info);
-	info.port = 8080;
+	info.port = 8082;
 
 	memset(&keggy_status, 0, sizeof keggy_status);
 	keggy_status.controller_id = -1;
