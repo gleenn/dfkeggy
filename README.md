@@ -13,6 +13,7 @@ Installation (Ubuntu)
 	sudo rosdep init
 	rosdep update
 	sudo apt-get install python-rosinstall
+	sudo apt-get install gpsd
 	echo "source /opt/ros/jade/setup.bash" >> ~/.bashrc
 	source /opt/ros/jade/setup.bash
 	roscore&

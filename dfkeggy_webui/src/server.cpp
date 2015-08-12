@@ -574,6 +574,8 @@ static struct option options[] = {
 	{ NULL, 0, 0, 0 }
 };
 
+extern void broadcast_geometry();
+
 int main(int argc, char **argv)
 {
 	char cert_path[1024];
@@ -692,6 +694,9 @@ int main(int argc, char **argv)
     ros::Publisher  webui_pub = ros_node.advertise<dfkeggy_webui::WebUI>("webui", 1000);
     pub = &webui_pub;
     
+    ros::spinOnce();
+    broadcast_geometry();
+
 	n = 0;
 	while (n >= 0 && ros::ok() && !force_exit) {
 		n = libwebsocket_service(context, 50);
