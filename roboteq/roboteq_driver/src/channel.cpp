@@ -52,6 +52,7 @@ void Channel::cmdCallback(const roboteq_msgs::Command& command) {
   // Now get the -1000 .. 1000 command as a proportion of the maximum RPM.
   int roboteq_command = int((commanded_rpm / max_rpm_) * 1000.0);
   ROS_DEBUG_STREAM("Sending command value of " << roboteq_command << " to motor driver.");
+  // ROS_WARN_STREAM("Sending command value of " << roboteq_command << " to motor driver: " << channel_num_);
 
   // Write the command.
   controller_->command << "G" << channel_num_ << roboteq_command << controller_->send;
@@ -82,8 +83,8 @@ void Channel::feedbackCallback(std::vector<std::string> fields) {
 void Channel::timerCallback(const ros::TimerEvent&) {
   if (ros::Time::now() - last_feedback_time_ > ros::Duration(1.0)) {
     // Not receiving feedback, attempt to start it.
-    controller_->setUserBool(channel_num_, 1);
-    controller_->flush();
+    // controller_->setUserBool(channel_num_, 1);
+    // controller_->flush();
   }
 }
 

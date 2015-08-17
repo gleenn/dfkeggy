@@ -141,6 +141,7 @@ void Controller::write(std::string msg) {
 
 void Controller::flush() {
   ROS_DEBUG_STREAM_NAMED("serial", "TX: " << boost::algorithm::replace_all_copy(tx_buffer_.str(), "\r", "\\r"));
+  ROS_WARN_STREAM_NAMED("serial", "TX: " << boost::algorithm::replace_all_copy(tx_buffer_.str(), "\r", "\\r"));
   ssize_t bytes_written = serial_->write(tx_buffer_.str());
   if (bytes_written < tx_buffer_.tellp()) {
     ROS_WARN_STREAM("Serial write timeout, " << bytes_written << " bytes written of " << tx_buffer_.tellp() << ".");
@@ -208,6 +209,7 @@ void Controller::processFeedback(std::string msg) {
 }
 
 bool Controller::downloadScript() {
+  if (true) return true;
   ROS_DEBUG("Commanding driver to stop executing script.");
   stopScript(); flush();
   ros::Duration(0.5).sleep();

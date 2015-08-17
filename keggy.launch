@@ -1,0 +1,10 @@
+<launch>
+    <node pkg="roboteq_driver" type="driver_node" name="roboteq_driver" output="screen">
+        <rosparam>
+            port: /dev/ttyUSB0
+            baud: 115200
+            channels: ["roboteq_left", "roboteq_right"]
+        </rosparam>
+    </node>
+    <node pkg="dfkeggy_webui" type="dfkeggy_webui" name="dfkeggy_webui" output="screen" />
+</launch>

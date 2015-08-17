@@ -129,7 +129,7 @@ enum demo_protocols {
 };
 
 
-#define LOCAL_RESOURCE_PATH "dfkeggy_webui/www"
+#define LOCAL_RESOURCE_PATH "../dfkeggy_webui/www"
 const char *resource_path = LOCAL_RESOURCE_PATH;
 
 /*
