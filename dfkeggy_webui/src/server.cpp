@@ -32,6 +32,7 @@
 #include <sys/time.h>
 #include <unistd.h>
 #include <sstream>
+#include <linux/limits.h>
 #include <libwebsockets.h>
 #include "ros/ros.h"
 #include "std_msgs/String.h"
@@ -129,8 +130,7 @@ enum demo_protocols {
 };
 
 
-#define LOCAL_RESOURCE_PATH "../dfkeggy_webui/www"
-const char *resource_path = LOCAL_RESOURCE_PATH;
+const char *resource_path = 0;
 
 /*
  * We take a strict whitelist approach to stop ../ attacks
@@ -576,6 +576,11 @@ static struct option options[] = {
 
 extern void broadcast_geometry();
 
+std::string get_cwd() {
+	char buf[PATH_MAX];
+	return getcwd(buf,PATH_MAX);
+}
+
 int main(int argc, char **argv)
 {
 	char cert_path[1024];
@@ -597,6 +602,11 @@ int main(int argc, char **argv)
 	memset(&keggy_status, 0, sizeof keggy_status);
 	keggy_status.controller_id = -1;
 	keggy_status.mode = 'S';
+
+	std::string keggy_home = getenv("KEGGY_HOME") ? std::string(getenv("KEGGY_HOME")) : get_cwd(); 
+	std::string webroot = keggy_home + "/dfkeggy_webui/www";
+	resource_path = webroot.c_str();
+	printf("KEGGY_HOME=%s\n", keggy_home.c_str());
 
 	while (n >= 0) {
 		n = getopt_long(argc, argv, "eci:hsap:d:Dr:", options, NULL);

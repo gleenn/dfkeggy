@@ -13,6 +13,7 @@ Installation (Ubuntu)
 	sudo rosdep init
 	rosdep update
 	sudo apt-get install python-rosinstall
+	sudo apt-get install ros-jade-roboteq-driver
 	sudo apt-get install gpsd
 	sudo usermod -a -G dialout $USER
 	echo "source /opt/ros/jade/setup.bash" >> ~/.bashrc
