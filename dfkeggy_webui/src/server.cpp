@@ -73,7 +73,7 @@ void handle(int cid, const char *msg) {
 		rosmsg.mode = 'S';
 		printf("RX c%d STOP\n", cid);
 	}
-	else if (*msg == 'F' && sscanf(msg, "F:%lf:%lf:%f", &d1, &d2, &d3) == 3) {
+	else if (*msg == 'F' && sscanf(msg, "F:%lf:%lf:%lf", &d1, &d2, &d3) == 3) {
 		keggy_status.controller_id = cid;
 		keggy_status.mode = 'F';
 		keggy_status.goalX = d1;

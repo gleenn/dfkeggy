@@ -7,7 +7,10 @@ SOURCES:=\
 all: run
 
 run: build
-	export KEGGY_HOME=$(shell pwd) && source build/catkin_ws/devel/setup.bash && roslaunch keggy-sim.launch 
+	export KEGGY_HOME=$(shell pwd) && source build/catkin_ws/devel/setup.bash && roslaunch keggy-sim.launch
+
+runhw: build
+	export KEGGY_HOME=$(shell pwd) && source build/catkin_ws/devel/setup.bash && roslaunch keggy-hrd.launch
 
 build: build/catkin_ws $(SOURCES)
 	cd build/catkin_ws && source devel/setup.bash && catkin_make
@@ -29,4 +32,4 @@ build/catkin_ws:
 	cd build/catkin_ws && rosdep install -r --from-paths .
 	ln -s ../../../dfkeggy_webui build/catkin_ws/src/webui
 	ln -s ../../../roboteq build/catkin_ws/src/roboteq
-
+	ln -s ../../../compass build/catkin_ws/src/compass
