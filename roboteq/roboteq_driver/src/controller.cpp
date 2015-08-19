@@ -116,7 +116,7 @@ void Controller::read() {
     }
   } else {
     ROS_WARN_NAMED("serial", "Serial::readline() returned no data.");
-    if (!receiving_script_messages) {
+    /*if (!receiving_script_messages) {
       if (start_script_attempts_ < 5) {
         start_script_attempts_++;
         ROS_DEBUG("Attempt #%d to start MBS program.", start_script_attempts_);
@@ -131,7 +131,7 @@ void Controller::read() {
       }
     } else {
       ROS_DEBUG("Script is believed to be in-place and running, so taking no action.");
-    }
+    }*/
   }
 }
 

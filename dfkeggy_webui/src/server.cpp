@@ -123,8 +123,18 @@ void handle(int cid, const char *msg) {
 			//printf
 			roboteq_msgs::Command cmd;
 			cmd.commanded_velocity = keggy_status.vl * 500;
+			if (cmd.commanded_velocity > 1000) {
+			    cmd.commanded_velocity = 1000;
+			} else if (cmd.commanded_velocity < -1000) {
+			    cmd.commanded_velocity = -1000;
+			}
 			lwp->publish(cmd);
 			cmd.commanded_velocity = keggy_status.vr * 500;
+			if (cmd.commanded_velocity > 1000) {
+			    cmd.commanded_velocity = 1000;
+			} else if (cmd.commanded_velocity < -1000) {
+			    cmd.commanded_velocity = -1000;
+			}
 			rwp->publish(cmd);
 		}
 		printf("RX c%d CONTROL vl=%1.3lf, vr=%1.3lf\n", cid, d1, d2);
