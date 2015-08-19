@@ -340,6 +340,7 @@
                 keggy.goalX = data.goalX;
                 keggy.goalY = data.goalY;
                 keggy.goalTheta = data.goalTheta;
+                keggy.heading = fromDegrees(data.heading);
             }; 
             sock.onclose = function() {
                 sock = null;

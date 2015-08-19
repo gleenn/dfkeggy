@@ -38,6 +38,8 @@
 #include "std_msgs/String.h"
 #include "dfkeggy_webui/WebUI.h"
 #include "roboteq_msgs/Command.h"
+#include "dfcompass_msgs/status.h"
+
 
 ros::Publisher *pub = NULL, *lwp = NULL, *rwp = NULL;
 
@@ -54,6 +56,7 @@ struct keggy_status_t {
 	char mode;
 	double lat;
 	double lng;
+	double heading;
 	double vl;
 	double vr;
 	double goalX;
@@ -136,10 +139,10 @@ void handle(int cid, const char *msg) {
 }
 
 size_t format_status(int cid, char *buf) {
-	return sprintf(buf, "{\"active\":%d, \"mode\":\"%c\", \"vl\": %2.5lf, \"vr\": %2.5lf, \"location\": [%lf, %lf], \"goalX\":%lf, \"goalY\":%lf, \"goalTheta\":%f}", 
+	return sprintf(buf, "{\"active\":%d, \"mode\":\"%c\", \"vl\": %2.5lf, \"vr\": %2.5lf, \"location\": [%lf, %lf], \"heading\": %lf, \"goalX\":%lf, \"goalY\":%lf, \"goalTheta\":%f}", 
 		cid == keggy_status.controller_id, keggy_status.mode,
 		keggy_status.vl, keggy_status.vr,
-		keggy_status.lat, keggy_status.lng,
+		keggy_status.lat, keggy_status.lng, keggy_status.heading,
 		keggy_status.goalX, keggy_status.goalY, keggy_status.goalT);
 }
 
@@ -619,6 +622,10 @@ std::string get_cwd() {
 	return getcwd(buf,PATH_MAX);
 }
 
+void callback_compass(const dfcompass_msgs::status::ConstPtr& msg) {
+	keggy_status.heading = msg->heading_degrees;
+}
+
 int main(int argc, char **argv)
 {
 	char cert_path[1024];
@@ -742,6 +749,7 @@ int main(int argc, char **argv)
     ros::Publisher  webui_pub = ros_node.advertise<dfkeggy_webui::WebUI>("webui", 1000);
     ros::Publisher  left_wheel_pub = ros_node.advertise<roboteq_msgs::Command>("roboteq_left", 1000);
     ros::Publisher  right_wheel_pub = ros_node.advertise<roboteq_msgs::Command>("roboteq_right", 1000);
+    ros::Subscriber sub = ros_node.subscribe("status", 1000, callback_compass);
     pub = &webui_pub;
     lwp = &left_wheel_pub;
     rwp = &right_wheel_pub;
