@@ -32,6 +32,26 @@ Create ROS workspace
 	cd ~/keggy_ws && catkin_make -DCMAKE_BUILD_TYPE="Release"
 
 
+Create UDEV rules:
+sudo vi /etc/udev/rules.d/usb-parse-devpath.pm
+
+#!/usr/bin/perl -w
+
+@items = split("/", $ARGV[0]);
+for ($i = 0; $i < @items; $i++) {
+    if ($items[$i] =~ m/^usb[0-9]+$/) {
+        print $items[$i + 2] . "\n";
+        last;
+    }
+}
+
+sudo chmod u+x /etc/udev/rules.d/usb-parse-devpath.pm
+sudo vi /etc/udev/rules.d/usb-parse-devpath.rules
+Add this:
+  ACTION=="add", KERNEL=="ttyUSB[0-9]*", PROGRAM="/etc/udev/rules.d/usb-parse-devpath.pm %p", SYMLINK+="usb-ports/%c"
+
+
+
 source build/devel/setup.bash
 roslaunch keggy.launch
 

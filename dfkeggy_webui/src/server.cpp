@@ -749,7 +749,7 @@ int main(int argc, char **argv)
     ros::Publisher  webui_pub = ros_node.advertise<dfkeggy_webui::WebUI>("webui", 1000);
     ros::Publisher  left_wheel_pub = ros_node.advertise<roboteq_msgs::Command>("roboteq_left", 1000);
     ros::Publisher  right_wheel_pub = ros_node.advertise<roboteq_msgs::Command>("roboteq_right", 1000);
-    ros::Subscriber sub = ros_node.subscribe("status", 1000, callback_compass);
+    ros::Subscriber sub = ros_node.subscribe("/dfcompass_driver/status", 1000, callback_compass);
     pub = &webui_pub;
     lwp = &left_wheel_pub;
     rwp = &right_wheel_pub;
