@@ -415,17 +415,18 @@
 
 
             if (gamma) {
-                keggy.vl = gamma;
-                keggy.vr = -gamma;
+                vl = gamma;
+                vr = -gamma;
             }
             else if (beta) {
-                keggy.vl = keggy.vr = -beta;
+                vl = vr = -beta;
             }
+            transmit();
         }
     }, false);
 
-    //connect();
-    keggy.connected = 1; mode = 'C'; keggy.active = true;
+    connect();
+    //keggy.connected = 1; mode = 'C'; keggy.active = true;
 </script>
 
 </body>

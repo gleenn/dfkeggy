@@ -37,8 +37,9 @@
 #include "ros/ros.h"
 #include "std_msgs/String.h"
 #include "dfkeggy_webui/WebUI.h"
+#include "roboteq_msgs/Command.h"
 
-ros::Publisher *pub = NULL;
+ros::Publisher *pub = NULL, *lwp = NULL, *rwp = NULL;
 
 static int close_testing;
 int max_poll_elements;
@@ -114,6 +115,15 @@ void handle(int cid, const char *msg) {
 		rosmsg.mode = 'C';
 		rosmsg.accel = d1;
 		rosmsg.turn = d2;
+
+		if (lwp && rwp) {
+			//printf
+			roboteq_msgs::Command cmd;
+			cmd.commanded_velocity = keggy_status.vl;
+			lwp->publish(cmd);
+			cmd.commanded_velocity = keggy_status.vr;
+			rwp->publish(cmd);
+		}
 		printf("RX c%d CONTROL vl=%1.3lf, vr=%1.3lf\n", cid, d1, d2);
 	}
 	else {
@@ -730,7 +740,11 @@ int main(int argc, char **argv)
     ros::init(argc, argv, "dfkeggy_webui");
     ros::NodeHandle ros_node;
     ros::Publisher  webui_pub = ros_node.advertise<dfkeggy_webui::WebUI>("webui", 1000);
+    ros::Publisher  left_wheel_pub = ros_node.advertise<roboteq_msgs::Command>("roboteq_left", 1000);
+    ros::Publisher  right_wheel_pub = ros_node.advertise<roboteq_msgs::Command>("roboteq_right", 1000);
     pub = &webui_pub;
+    lwp = &left_wheel_pub;
+    rwp = &right_wheel_pub;
     
     ros::spinOnce();
     broadcast_geometry();
