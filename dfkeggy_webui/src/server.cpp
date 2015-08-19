@@ -66,6 +66,26 @@ struct keggy_status_t {
 
 keggy_status_t keggy_status;
 
+void drive(double vl, double vr) {
+	if (lwp && rwp) {
+		roboteq_msgs::Command cmd;
+		cmd.commanded_velocity = vl * 500;
+		if (cmd.commanded_velocity > 1000) {
+		    cmd.commanded_velocity = 1000;
+		} else if (cmd.commanded_velocity < -1000) {
+		    cmd.commanded_velocity = -1000;
+		}
+		lwp->publish(cmd);
+		cmd.commanded_velocity = vr * 500;
+		if (cmd.commanded_velocity > 1000) {
+		    cmd.commanded_velocity = 1000;
+		} else if (cmd.commanded_velocity < -1000) {
+		    cmd.commanded_velocity = -1000;
+		}
+		rwp->publish(cmd);
+	}
+}
+
 void handle(int cid, const char *msg) {
 	dfkeggy_webui::WebUI rosmsg;
 	double d1, d2, d3;
@@ -73,7 +93,7 @@ void handle(int cid, const char *msg) {
 		keggy_status.controller_id = cid;
 		keggy_status.mode = 'S';
 		keggy_status.vl = keggy_status.vr = 0;
-		rosmsg.mode = 'S';
+		drive(0,0);
 		printf("RX c%d STOP\n", cid);
 	}
 	else if (*msg == 'F' && sscanf(msg, "F:%lf:%lf:%lf", &d1, &d2, &d3) == 3) {
@@ -82,9 +102,6 @@ void handle(int cid, const char *msg) {
 		keggy_status.goalX = d1;
 		keggy_status.goalY = d2;
 		keggy_status.goalT = d3;
-		rosmsg.mode = 'F';
-		rosmsg.target_lat = d1;
-		rosmsg.target_lng = d2;
 		printf("RX c%d GOAL dx=%2.5lf, dy=%2.5lf, dtheta=%2.5lf\n", cid, d1, d2, d3);
 
 
@@ -114,37 +131,11 @@ void handle(int cid, const char *msg) {
 		keggy_status.mode = 'C';
 		keggy_status.vl = d1;
 		keggy_status.vr = d2;
-
-		rosmsg.mode = 'C';
-		rosmsg.accel = d1;
-		rosmsg.turn = d2;
-
-		if (lwp && rwp) {
-			//printf
-			roboteq_msgs::Command cmd;
-			cmd.commanded_velocity = keggy_status.vl * 500;
-			if (cmd.commanded_velocity > 1000) {
-			    cmd.commanded_velocity = 1000;
-			} else if (cmd.commanded_velocity < -1000) {
-			    cmd.commanded_velocity = -1000;
-			}
-			lwp->publish(cmd);
-			cmd.commanded_velocity = keggy_status.vr * 500;
-			if (cmd.commanded_velocity > 1000) {
-			    cmd.commanded_velocity = 1000;
-			} else if (cmd.commanded_velocity < -1000) {
-			    cmd.commanded_velocity = -1000;
-			}
-			rwp->publish(cmd);
-		}
+		drive(keggy_status.vl, keggy_status.vr);
 		printf("RX c%d CONTROL vl=%1.3lf, vr=%1.3lf\n", cid, d1, d2);
 	}
 	else {
 		printf( "RX c%d BADMSG [%s]\n", cid, msg);
-	}
-
-	if (pub) {
-		pub->publish(rosmsg);
 	}
 }
 
