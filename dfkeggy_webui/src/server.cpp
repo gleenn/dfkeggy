@@ -53,17 +53,18 @@ struct keggy_status_t {
 	char mode;
 	double lat;
 	double lng;
-	double target_lat;
-	double target_lng;
 	double vl;
 	double vr;
+	double goalX;
+	double goalY;
+	double goalT;
 };
 
 keggy_status_t keggy_status;
 
 void handle(int cid, const char *msg) {
 	dfkeggy_webui::WebUI rosmsg;
-	double d1, d2;
+	double d1, d2, d3;
 	if (*msg == 'S') {
 		keggy_status.controller_id = cid;
 		keggy_status.mode = 'S';
@@ -71,26 +72,49 @@ void handle(int cid, const char *msg) {
 		rosmsg.mode = 'S';
 		printf("RX c%d STOP\n", cid);
 	}
-	else if (*msg == 'F' && sscanf(msg, "F:%lf:%lf", &d1, &d2) == 2) {
+	else if (*msg == 'F' && sscanf(msg, "F:%lf:%lf:%f", &d1, &d2, &d3) == 3) {
 		keggy_status.controller_id = cid;
 		keggy_status.mode = 'F';
-		keggy_status.vl = keggy_status.vr = 0;
-		keggy_status.target_lat = d1;
-		keggy_status.target_lng = d2;
+		keggy_status.goalX = d1;
+		keggy_status.goalY = d2;
+		keggy_status.goalT = d3;
 		rosmsg.mode = 'F';
 		rosmsg.target_lat = d1;
 		rosmsg.target_lng = d2;
-		printf("RX c%d FOLLOW %2.5lf, %2.5lf\n", cid, d1, d2);
+		printf("RX c%d GOAL dx=%2.5lf, dy=%2.5lf, dtheta=%2.5lf\n", cid, d1, d2, d3);
+
+
+		// double keggy_width = 0.4;
+		// keggy_status.vl = -keggy_status.goalY + keggy_status.goalT*keggy_width/2;
+		// keggy_status.vr = -keggy_status.goalY - keggy_status.goalT*keggy_width/2;
+		// const double angular_threshold = M_PI/90;
+		// const double linear_threshold = 0.05;
+		// if (keggy_status.goalT > angular_threshold) {
+		// 	keggy_status.vl = +1;
+		// 	keggy_status.vr = -1;
+		// }
+		// else if (keggy_status.goalT < -angular_threshold) {
+		// 	keggy_status.vl = -1;
+		// 	keggy_status.vr = +1;
+		// }
+		// else if (fabs(keggy_status.goalY) > linear_threshold) {
+		// 	keggy_status.vl = keggy_status.vr = keggy_status.goalY > 0 ? -1 : 1;
+		// }
+		// else {
+		// 	keggy_status.vl = keggy_status.vr = 0;
+		// }
+
 	}
 	else if (*msg == 'C' && sscanf(msg, "C:%lf:%lf", &d1, &d2) == 2) {
 		keggy_status.controller_id = cid;
 		keggy_status.mode = 'C';
 		keggy_status.vl = d1;
 		keggy_status.vr = d2;
+
 		rosmsg.mode = 'C';
 		rosmsg.accel = d1;
 		rosmsg.turn = d2;
-		printf("RX c%d CONTROL %1.3lf, %1.3lf\n", cid, d1, d2);
+		printf("RX c%d CONTROL vl=%1.3lf, vr=%1.3lf\n", cid, d1, d2);
 	}
 	else {
 		printf( "RX c%d BADMSG [%s]\n", cid, msg);
@@ -102,10 +126,11 @@ void handle(int cid, const char *msg) {
 }
 
 size_t format_status(int cid, char *buf) {
-	return sprintf(buf, "{\"active\":%d, \"mode\":\"%c\", \"vl\": %2.5lf, \"vr\": %2.5lf, \"dest\": [%1.7lf, %1.7lf]}", 
+	return sprintf(buf, "{\"active\":%d, \"mode\":\"%c\", \"vl\": %2.5lf, \"vr\": %2.5lf, \"location\": [%lf, %lf], \"goalX\":%lf, \"goalY\":%lf, \"goalTheta\":%f}", 
 		cid == keggy_status.controller_id, keggy_status.mode,
 		keggy_status.vl, keggy_status.vr,
-		keggy_status.target_lat, keggy_status.target_lng);
+		keggy_status.lat, keggy_status.lng,
+		keggy_status.goalX, keggy_status.goalY, keggy_status.goalT);
 }
 
 /*
@@ -160,6 +185,9 @@ const char * get_mimetype(const char *file)
 
 	if (!strcmp(&file[n - 5], ".html"))
 		return "text/html";
+
+	if (!strcmp(&file[n - 3], ".js"))
+		return "application/javascript";
 
 	return NULL;
 }

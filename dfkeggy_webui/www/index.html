@@ -5,80 +5,323 @@
     <title>Keggy Controller</title>
     <meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-s-bar-style" content="black">
     <style>
-        #status {
+        .keggy-controller {
             position: absolute;
-            left: 0px;
-            top: 0px;
-            right: 0px;
-            bottom: 120px;
-            background: #fff;
-            text-align: center;
-            padding: 40px;
+            width: 100%;
+            height: 100%;
         }
-        #controls {
+
+        .keggy-controller .map {
+            position: absolute;
+            left: 15px;
+            top: 15px;
+            right: 15px;
+            bottom: 50px;
+        }
+
+        .keggy-controller .map .compass {
+            stroke: #aaa;
+            stroke-width: 1px;
+            fill: none;
+        }
+
+        .keggy-controller .map .compass text {
+             stroke: none;
+             fill: #ccc;
+             font-family: Verdana;
+             font-size: 14px;
+        }
+
+        .keggy-controller .map .goal line, .keggy-controller .map .goal circle {
+            stroke: #0000ff;
+            stroke-width: 1px;
+            fill: none;
+        }
+
+        .keggy-controller .map .keggy {
+            stroke: #111;
+            stroke-width: 2px;
+            fill: none;
+        }
+
+        .keggy-controller .map .keggy .wheel line {
+            stroke: #ff0000;
+            stroke-width: 1px;
+            stroke-opacity: 0.8;
+        }
+
+        .keggy-controller .controls {
             position: absolute;
             left: 0px;
             height: 120px;
             right: 0px;
             bottom: 0px;
+            text-align: center;
+        }
+
+        .keggy-controller .controls circle {
+            stroke: #aaa;
+            fill: #fff;
+            stroke-width: 2px;
+        }
+
+        .keggy-controller .controls text {
+            fill: #aaa;
+            stroke-width: 0px;
+            font-family: Helvetica;
+            font-size: 10px;
+            font-weight: bold;
+            text-anchor: middle;
+        }
+
+        .keggy-controller .controls .btn.selected circle {
+            fill: #dddddd;
+        }
+
+        .keggy-controller .controls.active circle {
+            stroke: #00aa00;
+        }
+
+        .keggy-controller .controls.active text {
+            fill: #00aa00;
+        }
+
+        .keggy-controller .connect {
+            position: absolute;
+            left: 0px;
+            top: 0px;
+            right: 0px;
+            bottom: 0px;
             background: #fff;
-        	text-align: center;
+            text-align: center;
+            padding: 40px;
         }
 
-        #controls circle {
-			fill: #ccc;
-            fill-opacity: 0;
-			stroke: #222;
-			stroke-width: 2px;
-        }
-
-        #controls .active circle {
-            fill-opacity: 1;
-        }
-
-        #controls text {
-			fill: #222;
-			stroke-width: 0px;
-			font-family: Helvetica;
-			font-size: 10px;
-			font-weight: bold;
-			text-anchor: middle;
-        }
     </style>
+    <script src="d3.js"></script>
 </head>
 <body>
 
-<div id="status">Disconnected</div>
-<div id="controls">
-    <svg xmlns="http://www.w3.org/2000/svg" width="300" height="100">
-    	<g id="follow-btn" cursor="pointer" onclick="setMode('F')">
-  			<circle id="follow-btn" cx="50" cy="50" r="35" />
-  			<text x="50" y="56">FOLLOW</text>
-  		</g>
-    	<g id="stop-btn" cursor="pointer" onclick="setMode('S')">
-  			<circle cx="150" cy="50" r="45"/>
-  			<text x="150" y="56">STOP</text>
-  		</g>
-    	<g id="control-btn" cursor="pointer" onclick="setMode('C')">
-  			<circle cx="250" cy="50" r="35"/>
-  			<text x="250" y="56">CONTROL</text>
-  		</g>
-    </svg>	
+<div class="keggy-controller">
+    <div class="map">
+        <svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">
+            <g class="compass">
+                <circle cx="0" cy="0"></circle>
+                <text class="north" x="0">N</text>
+                <text class="south" x="0">S</text>
+                <text class="east" y="0">E</text>
+                <text class="west" y="0">W</text>
+            </g>
+            <g class="goal">
+                <line x1="0" y1="0" y2="0"></line>
+                <circle cx="0", cy="0", r="5"></line>
+            </g>
+            <g class="keggy">
+                <rect class="base"/>
+            </g>
+        </svg>
+    </div>
+    <div class="controls">
+        <svg xmlns="http://www.w3.org/2000/svg" width="300px" height="100%">
+        	<g class="btn mode-f" cursor="pointer">
+      			<circle cx="50" cy="50" r="35" />
+      			<text x="50" y="56">FOLLOW</text>
+      		</g>
+        	<g class="btn mode-s" cursor="pointer">
+      			<circle cx="150" cy="50" r="45"/>
+      			<text x="150" y="56">STOP</text>
+      		</g>
+        	<g class="btn mode-c" cursor="pointer">
+      			<circle cx="250" cy="50" r="35"/>
+      			<text x="250" y="56">CONTROL</text>
+      		</g>
+        </svg>	
+    </div>
+    <div class="connect">Disconnected</div>
 </div>
 
-<script>	
-	var sock = null, 
-		mode = 'S',
-        modeNames = {S: 'stop', F: 'follow', C: 'control'},
-		controlAcceleration = 0,
-		controlDirection = 0,
-		followLat = 0, 
-		followLng = 0, 
-		followAccuracy = 1E9, 
-		followTs = 0,
-        keggyStatus = null;
+<script>
+    var toDegrees = function(rad) {
+        return (rad * 180 / Math.PI) % 360;
+    };
+
+    var fromDegrees = function(deg) {
+        return deg * Math.PI / 180;
+    };
+
+    var normalizeAngle = function(angle, center) {
+        center = center === undefined ? 0 : center;
+        return angle - Math.PI*2*Math.floor((angle + Math.PI - center)/(Math.PI*2));
+    };
+
+    var KeggyWidget = function(node) {
+        var self = this,
+            baseLength = 1,
+            baseWidth = 0.8,
+            wheelRadius = 0.2,
+            wheelWidth = 0.1,
+            heading = 0,
+            vl = 0,
+            vr = 0,
+            goalX = 0,
+            goalY = 0,
+            goalT = 0;
+
+        var render = function() {
+            var winWidth = node.clientWidth,
+                winHeight = node.clientHeight;
+                winR = Math.min(winWidth, winHeight)/2 - 15;
+
+            var toPixels = function(meters) {
+                return 0.7*meters*winR/baseLength;
+            };
+
+            // compass
+            d3.select(node)
+                .select('.compass')
+                .attr('transform', 'translate(' + winWidth/2 + ',' + winHeight/2 + ') rotate(' + toDegrees(heading) + ')');
+            d3.select(node)
+                .select('.compass circle')
+                .attr('r', winR) ;
+            d3.select(node).select('.compass text.north').attr('y', -winR-5) ;
+            d3.select(node).select('.compass text.south').attr('y', winR+15) ;
+            d3.select(node).select('.compass text.east').attr('x', winR+5) ;
+            d3.select(node).select('.compass text.west').attr('x', -winR-21) ;
+            
+            // goal
+            d3.select(node)
+                .select('.goal line')
+                .attr('y2', -winR)
+                .style('visibility', (goalX == 0 && goalY == 0 && goalTheta == 0) ? 'hidden' : 'visible')
+                .attr('transform', 'translate(' + winWidth/2 + ',' + winHeight/2 + ') rotate(' + toDegrees(goalT) + ')');
+
+            d3.select(node)
+                .select('.goal circle')
+                .attr('transform', 'translate(' + (winWidth/2 + goalX*winR) + ',' + (winHeight/2 + goalY*winR) + ')');
+
+            // keggy
+            d3.select(node)
+                .select('.keggy')
+                .attr('transform', 'translate(' + winWidth/2 + ',' + winHeight/2 + ')');
+            d3.select(node)
+                .select('.keggy')
+                .select('.base')
+                .attr('x', -toPixels(baseWidth/2))
+                .attr('y', -toPixels(baseLength/2))
+                .attr('width', toPixels(baseWidth))
+                .attr('height', toPixels(baseLength));
+
+            var wheels = d3.select(node)
+                .select('.keggy')
+                .selectAll('.wheel')
+                .data([
+                    [ baseWidth/2+wheelWidth,  baseLength/2, 'right back'],
+                    [-baseWidth/2-wheelWidth,  baseLength/2, 'left back'],
+                    [ baseWidth/2+wheelWidth, -baseLength/2, 'right front'],
+                    [-baseWidth/2-wheelWidth, -baseLength/2, 'left front']
+                ]);
+            wheels.enter()
+                .append('g')
+                .call(function(wheels) {
+                    wheels.each(function() {
+                        d3.select(this).append('rect');
+                        d3.select(this).append('line');
+                        d3.select(this).append('circle').attr('r', 2);
+                    });
+                });
+            wheels.exit()
+                .remove();
+            wheels.each(function(d) {
+                d3.select(this)
+                    .attr('class', 'wheel ' + d[2])
+                    .attr('transform', 'translate(' + toPixels(d[0]) + ',' + toPixels(d[1]) + ')');
+                d3.select(this)
+                    .select('rect')    
+                    .attr('x', -toPixels(wheelWidth/2))
+                    .attr('y', -toPixels(wheelRadius))
+                    .attr('width', toPixels(wheelWidth))
+                    .attr('height', toPixels(wheelRadius*2));
+                d3.select(this)
+                    .select('line')    
+                    .attr('x1', 0)
+                    .attr('y1', 0)
+                    .attr('x2', 0)
+                    .attr('y2', 0) ;
+            })
+
+            d3.select(node)
+                .selectAll('.wheel.left line')  
+                .attr('y2', -toPixels(baseLength/2) * vl);  
+            d3.select(node)
+                .selectAll('.wheel.right line')  
+                .attr('y2', -toPixels(baseLength/2) * vr);  
+        };
+
+        d3.select(window).on('resize', function() {
+            render();
+        })
+        d3.select(node).select('.mode-f').on('click', function() {
+            self.onclick && self.onclick('F');
+        })
+        d3.select(node).select('.mode-s').on('click', function() {
+            self.onclick && self.onclick('S');
+        })
+        d3.select(node).select('.mode-c').on('click', function() {
+            self.onclick && self.onclick('C');
+        })
+ 
+        Object.defineProperty(this, "vl", { 
+            get : function () {return vl; },
+            set : function (v) { vl = v; render(); },
+        });
+        Object.defineProperty(this, "vr", { 
+            get : function () {return vr; },
+            set : function (v) { vr = v; render(); },
+        });
+        Object.defineProperty(this, "heading", { 
+            get : function () {return heading; },
+            set : function (v) { heading = v; render(); },
+        });
+        Object.defineProperty(this, "goalX", { 
+            get : function () {return goalX; },
+            set : function (v) { goalX = v; render(); },
+        });
+        Object.defineProperty(this, "goalY", { 
+            get : function () {return goalY; },
+            set : function (v) { goalY = v; render(); },
+        });
+        Object.defineProperty(this, "goalTheta", { 
+            get : function () {return goalT; },
+            set : function (v) { goalT = v; render(); },
+        });
+        Object.defineProperty(this, "active", { 
+            get : function () { return d3.select('.controls').classed('active'); },
+            set : function (v) { d3.select('.controls').classed('active', v); },
+        });
+        Object.defineProperty(this, "connected", { 
+            get : function () { return d3.select('.connect').style('visibility') == 'hidden'; },
+            set : function (v) { d3.select('.connect').style('visibility', v ? 'hidden' : 'visible'); },
+        });
+        Object.defineProperty(this, "mode", { 
+            set : function (v) { 
+                d3.selectAll('.btn').classed('selected', false);
+                d3.select('.btn.mode-' + v.toLowerCase()).classed('selected', true);
+            },
+        });
+
+        render();
+    };
+
+    var keggy = new KeggyWidget(d3.select('.keggy-controller').node()),
+        vl = 0, 
+        vr = 0, 
+        goalX = 0,
+        goalY = 0,
+        goalTheta = 0,
+        mode = 'S', 
+        sock = null;
 	
 	var connect = function() {
 		var l = window.location,
@@ -86,19 +329,21 @@
         try {
             sock = new WebSocket(wsurl, "keggyctl");
             sock.onopen = function() {
-                render();
+                keggy.connected = true;
             };
             sock.onmessage =function(msg) {
                 data = JSON.parse(msg.data);
-                console.log(data);
-                keggyStatus = data;
-                render();
+                keggy.active = data.active;
+                keggy.mode = data.mode;
+                keggy.vl = data.vl;
+                keggy.vr = data.vr;
+                keggy.goalX = data.goalX;
+                keggy.goalY = data.goalY;
+                keggy.goalTheta = data.goalTheta;
             }; 
             sock.onclose = function() {
                 sock = null;
-                keggyStatus = null;
-                render();
-                //setInterval(connect, 2000);
+                keggy.connected = false;
             };            
         }
         catch(err) {
@@ -107,45 +352,14 @@
         }
 	};
 
-	var render = function() {
-        // set button state
-        var mode = keggyStatus && keggyStatus.active ? keggyStatus.mode : null;
-        var activeButtonId = modeNames[mode] + '-btn';
-        var buttons = ['follow-btn', 'stop-btn', 'control-btn'];
-        for(var i=0; i<buttons.length; i++) {
-            var buttonId = buttons[i];
-            document.getElementById(buttonId).setAttribute('class',  
-                buttonId == activeButtonId ? 'active' : null);
-        }
-
-        // set status string
-        var html = '';
-        if (!keggyStatus) {
-            html = 'DISCONNECTED';
-        }
-        else {
-            html += (keggyStatus.active ? 'You have control' : 'Someone else has control');
-            html += '<br>';
-            html += 'Mode: ' + modeNames[keggyStatus.mode];
-            html += '<br>';
-            html += 'VL: ' + keggyStatus.vl.toFixed(3) + ', VR: ' + keggyStatus.vr.toFixed(3);
-            if (keggyStatus.mode == 'F') {
-                html += '<br>';
-                html += 'Destination: ' + keggyStatus.dest[1].toFixed(5) + ', ' + keggyStatus.dest[0].toFixed(5);
-            }
-
-        }
-		document.getElementById('status').innerHTML = html;
-	};
-
 	var transmit = function() {
 		if (sock) {
             var msg;
-            if (mode == 'F') {
-                msg = [mode, followLat, followLng].join(':');
+            if (mode == 'C') {
+                msg = [mode, vl, vr].join(':');
             }
-            else if (mode == 'C') {
-                msg = [mode, controlAcceleration, controlDirection].join(':');
+            else if (mode == 'F') {
+                msg = [mode, goalX, goalY, goalTheta].join(':');
             }
             else {
                 msg = [mode].join(':');
@@ -155,10 +369,10 @@
 		}
 	};
 
-	var setMode = function(m) {
-		mode = m;
-		transmit();
-	};
+    keggy.onclick = function(m) {
+        mode = m;
+        transmit();
+    };
 
     if (navigator.geolocation) {
         console.log( "Location services available");
@@ -185,25 +399,33 @@
     }
 
     window.addEventListener('deviceorientation', function(e) {
-    	function norm(val, min, max, center) {
-    		val -= center;
-    		var aval = Math.abs(val);
-    		if (aval < min) {
-    			return 0;
-    		}
-    		else if (aval > max) {
-    			return Math.round(val/aval);
-    		}
-			return Math.round(100*val/max)/100;
-    	}
-    	controlAcceleration = -norm(e.beta, 10, 30, 45);
-    	controlDirection = norm(e.gamma, 10, 30, 0);
-    	if (mode == 'C') {
-    		transmit();
-    	}
-    }, false);
-    connect();
+        if (mode == 'C') {
+            var betaScale = d3.scale.linear()
+                .domain([10, 15, 25, 30])
+                .range([-1, 0, 0, 1])
+                .clamp(true);
 
+            var gammaScale = d3.scale.linear()
+                .domain([-30,-10, 10, 30])
+                .range([-1, 0, 0, 1])
+                .clamp(true);
+
+            var beta = betaScale(e.beta),
+                gamma = gammaScale(e.gamma);
+
+
+            if (gamma) {
+                keggy.vl = gamma;
+                keggy.vr = -gamma;
+            }
+            else if (beta) {
+                keggy.vl = keggy.vr = -beta;
+            }
+        }
+    }, false);
+
+    //connect();
+    keggy.connected = 1; mode = 'C'; keggy.active = true;
 </script>
 
 </body>
