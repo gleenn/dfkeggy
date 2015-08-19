@@ -122,9 +122,9 @@ void handle(int cid, const char *msg) {
 		if (lwp && rwp) {
 			//printf
 			roboteq_msgs::Command cmd;
-			cmd.commanded_velocity = keggy_status.vl;
+			cmd.commanded_velocity = keggy_status.vl * 500;
 			lwp->publish(cmd);
-			cmd.commanded_velocity = keggy_status.vr;
+			cmd.commanded_velocity = keggy_status.vr * 500;
 			rwp->publish(cmd);
 		}
 		printf("RX c%d CONTROL vl=%1.3lf, vr=%1.3lf\n", cid, d1, d2);
@@ -624,6 +624,7 @@ std::string get_cwd() {
 
 void callback_compass(const dfcompass_msgs::status::ConstPtr& msg) {
 	keggy_status.heading = msg->heading_degrees;
+	request_transmit();
 }
 
 int main(int argc, char **argv)
@@ -747,8 +748,8 @@ int main(int argc, char **argv)
     ros::init(argc, argv, "dfkeggy_webui");
     ros::NodeHandle ros_node;
     ros::Publisher  webui_pub = ros_node.advertise<dfkeggy_webui::WebUI>("webui", 1000);
-    ros::Publisher  left_wheel_pub = ros_node.advertise<roboteq_msgs::Command>("roboteq_left", 1000);
-    ros::Publisher  right_wheel_pub = ros_node.advertise<roboteq_msgs::Command>("roboteq_right", 1000);
+    ros::Publisher  left_wheel_pub = ros_node.advertise<roboteq_msgs::Command>("/roboteq_left/cmd", 1000);
+    ros::Publisher  right_wheel_pub = ros_node.advertise<roboteq_msgs::Command>("/roboteq_right/cmd", 1000);
     ros::Subscriber sub = ros_node.subscribe("/dfcompass_driver/status", 1000, callback_compass);
     pub = &webui_pub;
     lwp = &left_wheel_pub;

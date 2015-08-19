@@ -112,7 +112,7 @@ void Controller::read() {
       receiving_script_messages = true;
     } else {
       // Unknown other message.
-      ROS_WARN_STREAM("Unknown serial message received: " << msg);
+      // ROS_WARN_STREAM("Unknown serial message received: " << msg);
     }
   } else {
     ROS_WARN_NAMED("serial", "Serial::readline() returned no data.");

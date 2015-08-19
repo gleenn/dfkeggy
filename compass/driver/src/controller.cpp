@@ -96,7 +96,7 @@ void Controller::read() {
 
 void Controller::processStatus(const std::string& msg) {
   // Example message: "H:  354 R:   -2 P:    6 Calib: 030"
-  ROS_DEBUG_STREAM_NAMED("serial", "RX: " << msg);
+  ROS_DEBUG_STREAM_NAMED("serial", "Compass RX: " << msg);
   char last_marker = 0;
   std::string header_str;
   std::vector<std::string> strs;
@@ -125,6 +125,10 @@ void Controller::processStatus(const std::string& msg) {
     ROS_WARN_STREAM_NAMED(
 	"serial", "Incorrect heading in RX data: '" << msg << "'");
     return;
+  }
+
+  if (heading == 0) {
+    ROS_WARN_STREAM_NAMED("serial", "Compass RX: " << msg);
   }
 
   dfcompass_msgs::status status_msg;
