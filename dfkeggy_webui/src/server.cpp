@@ -39,6 +39,7 @@
 #include "dfkeggy_webui/WebUI.h"
 #include "roboteq_msgs/Command.h"
 #include "dfcompass_msgs/status.h"
+#include "sensor_msgs/NavSatFix.h"
 
 
 ros::Publisher *pub = NULL, *lwp = NULL, *rwp = NULL;
