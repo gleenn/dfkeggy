@@ -18,28 +18,32 @@
  *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
  *  MA  02110-1301  USA
  */
-#include <lws_config.h>
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-#include <getopt.h>
-#include <signal.h>
-#include <string.h>
-#include <sys/stat.h>
-#include <fcntl.h>
+
 #include <assert.h>
+#include <fcntl.h>
+#include <getopt.h>
+#include <libwebsockets.h>
+#include <linux/limits.h>
+#include <lws_config.h>
+#include <signal.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <string.h>
 #include <syslog.h>
+#include <sys/stat.h>
 #include <sys/time.h>
 #include <unistd.h>
+
 #include <sstream>
-#include <linux/limits.h>
-#include <libwebsockets.h>
+
 #include "ros/ros.h"
-#include "std_msgs/String.h"
+
+#include "dfcompass_msgs/status.h"
 #include "dfkeggy_webui/WebUI.h"
 #include "roboteq_msgs/Command.h"
-#include "dfcompass_msgs/status.h"
 #include "sensor_msgs/NavSatFix.h"
+#include "std_msgs/String.h"
 
 
 ros::Publisher *pub = NULL, *lwp = NULL, *rwp = NULL;
@@ -624,9 +628,13 @@ std::string get_cwd() {
 	return getcwd(buf,PATH_MAX);
 }
 
-void callback_compass(const dfcompass_msgs::status::ConstPtr& msg) {
+static void callback_compass(const dfcompass_msgs::status::ConstPtr& msg) {
 	keggy_status.heading = msg->heading_degrees;
 	request_transmit();
+}
+
+static void callback_gps(const sensor_msgs::NavSatFix::ConstPtr& msg) {
+  printf("GPS data: longitude=%f, latitude=%f\n", msg->longitude, msg->latitude);
 }
 
 int main(int argc, char **argv)
@@ -752,7 +760,8 @@ int main(int argc, char **argv)
     ros::Publisher  webui_pub = ros_node.advertise<dfkeggy_webui::WebUI>("webui", 1000);
     ros::Publisher  left_wheel_pub = ros_node.advertise<roboteq_msgs::Command>("/roboteq_left/cmd", 1000);
     ros::Publisher  right_wheel_pub = ros_node.advertise<roboteq_msgs::Command>("/roboteq_right/cmd", 1000);
-    ros::Subscriber sub = ros_node.subscribe("/dfcompass_driver/status", 1000, callback_compass);
+    ros::Subscriber compass_sub = ros_node.subscribe("/dfcompass_driver/status", 1000, callback_compass);
+    ros::Subscriber gps_sub = ros_node.subscribe("/gps_driver/fix", 1000, callback_gps);
     pub = &webui_pub;
     lwp = &left_wheel_pub;
     rwp = &right_wheel_pub;
