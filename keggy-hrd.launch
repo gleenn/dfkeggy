@@ -12,5 +12,11 @@
             baud: 115200
         </rosparam>
     </node>
+    <node pkg="nmea_navsat_driver" type="nmea_serial_driver" name="gps_driver" output="screen">
+        <rosparam>
+            port: /dev/ttyUSB1
+            baud: 115200
+        </rosparam>
+    </node>
     <node pkg="dfkeggy_webui" type="dfkeggy_webui" name="dfkeggy_webui" output="screen" respawn="true"/>
 </launch>

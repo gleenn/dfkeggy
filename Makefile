@@ -1,8 +1,12 @@
 .PHONY: all clean build run
+
 export SHELL:=/bin/bash
-SOURCES:=\
-	dfkeggy_webui/src/*\
- 	roboteq/roboteq_driver/src/*  
+
+SOURCES := \
+	dfkeggy_webui/src/* \
+	roboteq/roboteq_driver/src/* \
+	nmea_navsat_driver/scripts/* \
+	nmea_navsat_driver/src/libnmea_navsat_driver/*
 
 all: run
 
@@ -33,3 +37,5 @@ build/catkin_ws:
 	ln -s ../../../dfkeggy_webui build/catkin_ws/src/webui
 	ln -s ../../../roboteq build/catkin_ws/src/roboteq
 	ln -s ../../../compass build/catkin_ws/src/compass
+	ln -s ../../../nmea_navsat_driver build/catkin_ws/src/nmea_navsat_driver
+

@@ -13,15 +13,31 @@ Installation (Ubuntu)
 	sudo rosdep init
 	rosdep update
 	sudo apt-get install python-rosinstall
-	sudo apt-get install ros-jade-roboteq-driver
-	sudo apt-get install gpsd
+	sudo apt-get install ros-jade-serial
 	sudo usermod -a -G dialout $USER
 	echo "source /opt/ros/jade/setup.bash" >> ~/.bashrc
 	source /opt/ros/jade/setup.bash
 	roscore&
 
 
-Create ROS workspace
+GPSD configuration
+
+	sudo apt-get install gpsd gpsd-clients
+	sudo vi /etc/default/gpsd
+		set DEVICES="/dev/ttyUSB_GarminGPS"
+		set USBAUTO=false
+	Other useful commands:
+		sudo dpkg-reconfigure gpsd
+		sudo /etc/init.d/gpsd start|stop
+		netstat -a | grep gpsd
+		xgps  (GUI test client for gpsd)
+		gpsmon /dev/ttyUSB_GarminGPS
+		gpscat -s [baudrate] [serial_port]  (to monitor gps output)
+		to start gpsd manually: gpsd -S [TCP_port] [serial_port]
+			then use: telnet localhost 2947, press any key???
+		rostopic echo /fix
+
+Create ROS workspace (not needed)
 
 	mkdir -p ~/keggy_ws/src && cd ~/keggy_ws/src
 	mkdir src && cd src
@@ -56,7 +72,8 @@ source build/devel/setup.bash
 roslaunch keggy.launch
 
 
-	sudo apt-get install ros-jade-roboteq-driver
+not needed? sudo apt-get install ros-jade-roboteq-driver
+
 
    ```
 cd ~
