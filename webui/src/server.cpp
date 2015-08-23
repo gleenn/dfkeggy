@@ -116,7 +116,7 @@ size_t format_status(int cid, char *buf) {
 	return sprintf(buf, "{\"active\":%d, \"mode\":\"%c\", \"vl\": %2.5lf, \"vr\": %2.5lf, \"location\": [%lf, %lf], \"heading\": %lf, \"goalX\":%lf, \"goalY\":%lf, \"goalTheta\":%f}", 
 		cid == ui_status.controller_id, ui_status.mode,
 		keggy_status.vl, keggy_status.vr,
-		keggy_status.lat, keggy_status.lng, keggy_status.heading,
+		keggy_status.lng, keggy_status.lat, keggy_status.heading,
 		ui_status.goalX, ui_status.goalY, ui_status.goalT);
 }
 

@@ -40,6 +40,12 @@
             fill: none;
         }
 
+        .keggy-controller .map .goal text {
+            fill: #0000ff;
+            font-size: 15px;
+            text-anchor: middle;
+        }
+
         .keggy-controller .map .keggy {
             stroke: #111;
             stroke-width: 2px;
@@ -116,7 +122,8 @@
             </g>
             <g class="goal">
                 <line x1="0" y1="0" y2="0"></line>
-                <circle cx="0", cy="0", r="5"></line>
+                <circle cx="0", cy="0", r="5"></circle>
+                <text x="0" y="0" dy="20"></text>
             </g>
             <g class="keggy">
                 <rect class="base"/>
@@ -143,21 +150,59 @@
 </div>
 
 <script>
-    var toDegrees = function(rad) {
-        return (rad * 180 / Math.PI) % 360;
-    };
-
-    var fromDegrees = function(deg) {
-        return deg * Math.PI / 180;
-    };
+    var EARTH_R =  6378137;
+    var TWO_PI = Math.PI*2;
 
     var normalizeAngle = function(angle, center) {
         center = center === undefined ? 0 : center;
         return angle - Math.PI*2*Math.floor((angle + Math.PI - center)/(Math.PI*2));
     };
 
+    var fromDegrees = function(deg) {
+        return deg * Math.PI / 180;
+    };
+
+    var toDegrees = function(rad) {
+        return (rad * 180 / Math.PI) % 360;
+    };
+
+    var fromFeet = function(ft) {
+        return ft/toFeet(1);
+    };
+
+    var toFeet = function(m) {
+        return m*3.28084;
+    };
+
+    var getDistance = function(from, to) {
+        // φ: latitude, λ: longitude 
+        var λ1 = fromDegrees(from[0]),
+            φ1 = fromDegrees(from[1]),
+            λ2 = fromDegrees(to[0]), 
+            φ2 = fromDegrees(to[1]),
+            Δλ = λ2 - λ1;
+        
+        return Math.acos( Math.sin(φ1)*Math.sin(φ2) + 
+            Math.cos(φ1)*Math.cos(φ2) * Math.cos(Δλ) ) * EARTH_R;
+    };
+
+    var getBearing = function(from, to) {
+        // φ: latitude, λ: longitude 
+        var λ1 = fromDegrees(from[0]),
+            φ1 = fromDegrees(from[1]),
+            λ2 = fromDegrees(to[0]), 
+            φ2 = fromDegrees(to[1]),
+            y = Math.sin(λ2-λ1) * Math.cos(φ2),
+            x = Math.cos(φ1)*Math.sin(φ2) -
+                Math.sin(φ1)*Math.cos(φ2)*Math.cos(λ2-λ1);
+
+        return Math.atan2(y, x);
+    };
+
+
     var KeggyWidget = function(node) {
         var self = this,
+            mode = 'S',
             baseLength = 1,
             baseWidth = 0.8,
             wheelRadius = 0.2,
@@ -167,7 +212,7 @@
             vr = 0,
             goalX = 0,
             goalY = 0,
-            goalT = 0;
+            goalT = null;
 
         var render = function() {
             var winWidth = node.clientWidth,
@@ -192,14 +237,22 @@
             
             // goal
             d3.select(node)
+                .select('.goal')
+                .style('visibility', mode != 'F' ? 'hidden' : 'visible');
+
+            d3.select(node)
                 .select('.goal line')
                 .attr('y2', -winR)
-                .style('visibility', (goalX == 0 && goalY == 0 && goalTheta == 0) ? 'hidden' : 'visible')
                 .attr('transform', 'translate(' + winWidth/2 + ',' + winHeight/2 + ') rotate(' + toDegrees(goalT) + ')');
 
             d3.select(node)
                 .select('.goal circle')
-                .attr('transform', 'translate(' + (winWidth/2 + goalX*winR) + ',' + (winHeight/2 + goalY*winR) + ')');
+                .attr('transform', 'translate(' + (winWidth/2 + toPixels(goalX)) + ',' + (winHeight/2 + toPixels(goalY)) + ')');
+
+            d3.select(node)
+                .select('.goal text')
+                .attr('transform', 'translate(' + (winWidth/2) + ',' + (winHeight/2) + ')')
+                .text( Math.sqrt(goalX*goalX + goalY*goalY).toFixed(1) + ' m' );
 
             // keggy
             d3.select(node)
@@ -306,6 +359,7 @@
         });
         Object.defineProperty(this, "mode", { 
             set : function (v) { 
+                mode = v;
                 d3.selectAll('.btn').classed('selected', false);
                 d3.select('.btn.mode-' + v.toLowerCase()).classed('selected', true);
             },
@@ -319,7 +373,10 @@
         vr = 0, 
         goalX = 0,
         goalY = 0,
-        goalTheta = 0,
+        goalTheta = null,
+        goalLocation = null,
+        goalAccuracy = null,
+        goalTs = null,
         mode = 'S', 
         sock = null;
 	
@@ -342,6 +399,7 @@
                 keggy.goalY = data.goalY;
                 keggy.goalTheta = data.goalTheta;
                 keggy.heading = fromDegrees(data.heading);
+                keggy.location = data.location;
             }; 
             sock.onclose = function() {
                 sock = null;
@@ -354,10 +412,26 @@
         }
 	};
 
+    var setGoal = function() {
+        if (keggy.active && mode == 'F' && keggy.location && goalLocation) {
+            var b = getBearing(keggy.location, goalLocation),
+                d = getDistance(keggy.location, goalLocation),
+                goalX = d*Math.cos(b),
+                goalY = d*Math.sin(b),
+                goalTheta = b;
+
+            keggy.goalX = goalX;
+            keggy.goalY = goalY;
+            keggy.goalTheta = goalTheta; 
+            console.log("Goal: ", goalX, goalY, goalTheta );           
+        }
+    };
+
 	var transmit = function() {
 		if (sock) {
-            var msg = [mode, vl, vr, goalX, goalY, goalTheta].join(':');
-			console.log('TX', msg);
+            setGoal();
+            var msg = [mode, vl, vr, goalX, goalY, goalTheta === null ? 0 : goalTheta].join(':');
+			//console.log('TX', msg);
 			sock.send(msg);
 		}
 	};
@@ -370,10 +444,9 @@
     if (navigator.geolocation) {
         console.log( "Location services available");
         var onPositionUpdate = function(pos) {
-            followTs = pos.timestamp/1000;
-            followLat = pos.coords.latitude;
-            followLng = pos.coords.longitude;
-            followAccuracy = pos.coords.accuracy;
+            goalTs = pos.timestamp/1000;
+            goalLocation=[pos.coords.longitude, pos.coords.latitude];
+            goalAccuracy = pos.coords.accuracy;
             if (mode == 'F') {
 	            transmit();
             }
