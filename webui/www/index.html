@@ -467,7 +467,8 @@
     window.addEventListener('deviceorientation', function(e) {
         if (mode == 'C') {
             var betaScale = d3.scale.linear()
-                .domain([10, 15, 25, 30])
+                .domain([-20, -5, 25, 30])
+                //.domain([10, 15, 25, 30])
                 .range([-1, 0, 0, 1])
                 .clamp(true);
 
