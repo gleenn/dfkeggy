@@ -1,0 +1,1 @@
+Nothing is in here yet, but we need to force directory into git (catkin build fails without it)

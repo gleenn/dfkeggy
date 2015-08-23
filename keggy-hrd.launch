@@ -18,5 +18,6 @@
             baud: 115200
         </rosparam>
     </node>
-    <node pkg="dfkeggy_webui" type="dfkeggy_webui" name="dfkeggy_webui" output="screen" respawn="true"/>
+    <node pkg="webui" type="webui" name="webui_node" output="screen" respawn="true"/>
+    <node pkg="chauffeur" type="chauffeur" name="chauffeur_node" output="screen" respawn="true"/>
 </launch>

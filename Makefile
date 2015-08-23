@@ -3,7 +3,8 @@
 export SHELL:=/bin/bash
 
 SOURCES := \
-	dfkeggy_webui/src/* \
+	webui/src/* \
+	chauffeur/src/* \
 	roboteq/roboteq_driver/src/* \
 	nmea_navsat_driver/scripts/* \
 	nmea_navsat_driver/src/libnmea_navsat_driver/*
@@ -34,8 +35,9 @@ build/catkin_ws:
 	cd build/catkin_ws/src && catkin_init_workspace 
 	cd build/catkin_ws && catkin_make
 	cd build/catkin_ws && rosdep install -r --from-paths .
-	ln -s ../../../dfkeggy_webui build/catkin_ws/src/webui
+	ln -s ../../../webui build/catkin_ws/src/webui
 	ln -s ../../../roboteq build/catkin_ws/src/roboteq
 	ln -s ../../../compass build/catkin_ws/src/compass
+	ln -s ../../../chauffeur build/catkin_ws/src/chauffeur
 	ln -s ../../../nmea_navsat_driver build/catkin_ws/src/nmea_navsat_driver
 

@@ -40,7 +40,7 @@
 #include "ros/ros.h"
 
 #include "dfcompass_msgs/status.h"
-#include "dfkeggy_webui/WebUI.h"
+#include "dfkeggy_webui/UIStatus.h"
 #include "roboteq_msgs/Command.h"
 #include "sensor_msgs/NavSatFix.h"
 #include "std_msgs/String.h"
@@ -57,99 +57,67 @@ static struct libwebsocket_context *context;
 void request_transmit();
 
 struct keggy_status_t {
-	int controller_id;
-	char mode;
 	double lat;
 	double lng;
+	double locacc;
 	double heading;
 	double vl;
 	double vr;
+};
+
+struct ui_status_t {
+	int controller_id;
+	char mode;
+	double cvl;
+	double cvr;
 	double goalX;
 	double goalY;
 	double goalT;
 };
 
+ui_status_t ui_status;
 keggy_status_t keggy_status;
 
-void drive(double vl, double vr) {
-	if (lwp && rwp) {
-		roboteq_msgs::Command cmd;
-		cmd.commanded_velocity = vl * 500;
-		if (cmd.commanded_velocity > 1000) {
-		    cmd.commanded_velocity = 1000;
-		} else if (cmd.commanded_velocity < -1000) {
-		    cmd.commanded_velocity = -1000;
-		}
-		lwp->publish(cmd);
-		cmd.commanded_velocity = vr * 500;
-		if (cmd.commanded_velocity > 1000) {
-		    cmd.commanded_velocity = 1000;
-		} else if (cmd.commanded_velocity < -1000) {
-		    cmd.commanded_velocity = -1000;
-		}
-		rwp->publish(cmd);
-	}
-}
-
 void handle(int cid, const char *msg) {
-	dfkeggy_webui::WebUI rosmsg;
-	double d1, d2, d3;
-	if (*msg == 'S') {
-		keggy_status.controller_id = cid;
-		keggy_status.mode = 'S';
-		keggy_status.vl = keggy_status.vr = 0;
-		drive(0,0);
-		printf("RX c%d STOP\n", cid);
-	}
-	else if (*msg == 'F' && sscanf(msg, "F:%lf:%lf:%lf", &d1, &d2, &d3) == 3) {
-		keggy_status.controller_id = cid;
-		keggy_status.mode = 'F';
-		keggy_status.goalX = d1;
-		keggy_status.goalY = d2;
-		keggy_status.goalT = d3;
-		printf("RX c%d GOAL dx=%2.5lf, dy=%2.5lf, dtheta=%2.5lf\n", cid, d1, d2, d3);
-
-
-		// double keggy_width = 0.4;
-		// keggy_status.vl = -keggy_status.goalY + keggy_status.goalT*keggy_width/2;
-		// keggy_status.vr = -keggy_status.goalY - keggy_status.goalT*keggy_width/2;
-		// const double angular_threshold = M_PI/90;
-		// const double linear_threshold = 0.05;
-		// if (keggy_status.goalT > angular_threshold) {
-		// 	keggy_status.vl = +1;
-		// 	keggy_status.vr = -1;
-		// }
-		// else if (keggy_status.goalT < -angular_threshold) {
-		// 	keggy_status.vl = -1;
-		// 	keggy_status.vr = +1;
-		// }
-		// else if (fabs(keggy_status.goalY) > linear_threshold) {
-		// 	keggy_status.vl = keggy_status.vr = keggy_status.goalY > 0 ? -1 : 1;
-		// }
-		// else {
-		// 	keggy_status.vl = keggy_status.vr = 0;
-		// }
-
-	}
-	else if (*msg == 'C' && sscanf(msg, "C:%lf:%lf", &d1, &d2) == 2) {
-		keggy_status.controller_id = cid;
-		keggy_status.mode = 'C';
-		keggy_status.vl = d1;
-		keggy_status.vr = d2;
-		drive(keggy_status.vl, keggy_status.vr);
-		printf("RX c%d CONTROL vl=%1.3lf, vr=%1.3lf\n", cid, d1, d2);
-	}
-	else {
-		printf( "RX c%d BADMSG [%s]\n", cid, msg);
+	char mode;
+	if (sscanf(msg, "%c:%lf:%lf:%lf:%lf:%lf",
+	 	&ui_status.mode, &ui_status.cvl, &ui_status.cvr, 
+	 	&ui_status.goalX, &ui_status.goalY, &ui_status.goalT) == 6) {
+		ui_status.controller_id = cid;
+		if (pub) {
+			dfkeggy_webui::UIStatus msg;
+			msg.mode = ui_status.mode;
+			msg.goal_x = ui_status.goalX;
+			msg.goal_y = ui_status.goalY;
+			msg.goal_theta = ui_status.goalT;
+			msg.v_left = ui_status.cvl;
+			msg.v_right = ui_status.cvr;
+			pub->publish(msg);
+			switch(mode) {
+				case 'C':
+					printf("webui: RTX c%d->ros CONTROL vl=%1.3lf, vr=%1.3lf\n", cid, msg.v_left, msg.v_right);
+					break;
+				case 'F':
+					printf("webui: RTX c%d->ros GOAL dx=%2.5lf, dy=%2.5lf, dtheta=%2.5lf\n", cid, msg.goal_x, msg.goal_y, msg.goal_theta);
+					break;
+				case 'S':
+					printf("webui: RTX c%d->ros STOP\n", cid);
+					break;
+				default:
+					printf("webui: c%d INVALID MODE\n", cid);
+			}
+		}	
+	} else {
+		printf( "webui: RX c%d BADMSG [%s]\n", cid, msg);
 	}
 }
 
 size_t format_status(int cid, char *buf) {
 	return sprintf(buf, "{\"active\":%d, \"mode\":\"%c\", \"vl\": %2.5lf, \"vr\": %2.5lf, \"location\": [%lf, %lf], \"heading\": %lf, \"goalX\":%lf, \"goalY\":%lf, \"goalTheta\":%f}", 
-		cid == keggy_status.controller_id, keggy_status.mode,
+		cid == ui_status.controller_id, ui_status.mode,
 		keggy_status.vl, keggy_status.vr,
 		keggy_status.lat, keggy_status.lng, keggy_status.heading,
-		keggy_status.goalX, keggy_status.goalY, keggy_status.goalT);
+		ui_status.goalX, ui_status.goalY, ui_status.goalT);
 }
 
 /*
@@ -550,7 +518,7 @@ callback_dumb_increment(struct libwebsocket_context *context,
 
 		case LWS_CALLBACK_ESTABLISHED:
 			pss->client_id = next_client_id++;
-			printf("RX c%d CONNECT\n", pss->client_id);
+			printf("webui: RX c%d CONNECT\n", pss->client_id);
 			request_transmit();	
 			break;
 
@@ -558,11 +526,11 @@ callback_dumb_increment(struct libwebsocket_context *context,
 			n = format_status(pss->client_id, (char *)p);
 			m = libwebsocket_write(wsi, p, n, LWS_WRITE_TEXT);
 			if (m < n) {
-				lwsl_err("ERROR %d writing to di socket\n", n);
+				printf("webui: ERROR %d writing to di socket\n", n);
 				return -1;
 			}
 			else {
-				printf("TX c%d %s\n", pss->client_id, (char*)p);
+				printf("webui: TX c%d %s\n", pss->client_id, (char*)p);
 			}
 			break;
 
@@ -634,7 +602,20 @@ static void callback_compass(const dfcompass_msgs::status::ConstPtr& msg) {
 }
 
 static void callback_gps(const sensor_msgs::NavSatFix::ConstPtr& msg) {
-  printf("GPS data: longitude=%f, latitude=%f\n", msg->longitude, msg->latitude);
+	keggy_status.lat = msg->latitude;
+	keggy_status.lng = msg->longitude;
+	keggy_status.locacc = sqrt(msg->position_covariance[0]);
+	request_transmit();
+}
+
+static void callback_left_wheel(const roboteq_msgs::Command::ConstPtr& msg) {
+	keggy_status.vl = msg->commanded_velocity;
+	request_transmit();
+}
+
+static void callback_right_wheel(const roboteq_msgs::Command::ConstPtr& msg) {
+	keggy_status.vr = msg->commanded_velocity;
+	request_transmit();
 }
 
 int main(int argc, char **argv)
@@ -656,57 +637,14 @@ int main(int argc, char **argv)
 	info.port = 8082;
 
 	memset(&keggy_status, 0, sizeof keggy_status);
-	keggy_status.controller_id = -1;
-	keggy_status.mode = 'S';
+	memset(&ui_status, 0, sizeof ui_status);
+	ui_status.controller_id = -1;
+	ui_status.mode = 'S';
 
 	std::string keggy_home = getenv("KEGGY_HOME") ? std::string(getenv("KEGGY_HOME")) : get_cwd(); 
-	std::string webroot = keggy_home + "/dfkeggy_webui/www";
+	std::string webroot = keggy_home + "/webui/www";
 	resource_path = webroot.c_str();
-	printf("KEGGY_HOME=%s\n", keggy_home.c_str());
-
-	while (n >= 0) {
-		n = getopt_long(argc, argv, "eci:hsap:d:Dr:", options, NULL);
-		if (n < 0)
-			continue;
-		switch (n) {
-		case 'e':
-			opts |= LWS_SERVER_OPTION_LIBEV;
-			break;
-		case 'd':
-			debug_level = atoi(optarg);
-			break;
-		case 's':
-			use_ssl = 1;
-			break;
-		case 'a':
-			opts |= LWS_SERVER_OPTION_ALLOW_NON_SSL_ON_SSL_PORT;
-			break;
-		case 'p':
-			info.port = atoi(optarg);
-			break;
-		case 'i':
-			strncpy(interface_name, optarg, sizeof interface_name);
-			interface_name[(sizeof interface_name) - 1] = '\0';
-			iface = interface_name;
-			break;
-		case 'c':
-			close_testing = 1;
-			fprintf(stderr, " Close testing mode -- closes on "
-					   "client after 50 dumb increments"
-					   "and suppresses lws_mirror spam\n");
-			break;
-		case 'r':
-			resource_path = optarg;
-			printf("Setting resource path to \"%s\"\n", resource_path);
-			break;
-		case 'h':
-			fprintf(stderr, "Usage: test-server "
-					"[--port=<p>] [--ssl] "
-					"[-d <log bitfield>] "
-					"[--resource_path <path>]\n");
-			exit(1);
-		}
-	}
+	printf("webui: KEGGY_HOME=%s\n", keggy_home.c_str());
 
 	signal(SIGINT, sighandler);
 
@@ -716,10 +654,6 @@ int main(int argc, char **argv)
 
 	/* tell the library what debug level to emit and to send it to syslog */
 	lws_set_log_level(debug_level, lwsl_emit_syslog);
-
-	lwsl_notice("libwebsockets test server - "
-			"(C) Copyright 2010-2015 Andy Green <andy@warmcat.com> - "
-						    "licensed under LGPL2.1\n");
 
 	printf("Using resource path \"%s\"\n", resource_path);
 
@@ -755,16 +689,17 @@ int main(int argc, char **argv)
 		return -1;
 	}
 
-    ros::init(argc, argv, "dfkeggy_webui");
+    ros::init(argc, argv, "webui");
     ros::NodeHandle ros_node;
-    ros::Publisher  webui_pub = ros_node.advertise<dfkeggy_webui::WebUI>("webui", 1000);
-    ros::Publisher  left_wheel_pub = ros_node.advertise<roboteq_msgs::Command>("/roboteq_left/cmd", 1000);
-    ros::Publisher  right_wheel_pub = ros_node.advertise<roboteq_msgs::Command>("/roboteq_right/cmd", 1000);
+    ros::Publisher  webui_pub = ros_node.advertise<dfkeggy_webui::UIStatus>("/webui/status", 1000);
+    ros::Subscriber left_wheel_sub = ros_node.subscribe("/roboteq_left/cmd", 1000, callback_left_wheel);
+    ros::Subscriber right_wheel_sub = ros_node.subscribe("/roboteq_right/cmd", 1000, callback_right_wheel);
     ros::Subscriber compass_sub = ros_node.subscribe("/dfcompass_driver/status", 1000, callback_compass);
     ros::Subscriber gps_sub = ros_node.subscribe("/gps_driver/fix", 1000, callback_gps);
+    //ros::Subscriber gps_sub = ros_node.subscribe("/sensor_msgs/NavSatFix", 1000, callback_gps);
     pub = &webui_pub;
-    lwp = &left_wheel_pub;
-    rwp = &right_wheel_pub;
+    //lwp = &left_wheel_pub;
+    //rwp = &right_wheel_pub;
     
     ros::spinOnce();
     broadcast_geometry();

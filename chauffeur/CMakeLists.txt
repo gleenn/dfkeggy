@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(dfkeggy_webui)
+project(dfkeggy_chauffeur)
 
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
@@ -8,7 +8,7 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   std_msgs
   geometry_msgs
-  tf
+  sensor_msgs
   message_generation
 )
 
@@ -46,10 +46,10 @@ find_package(catkin REQUIRED COMPONENTS
 ##   * add every package in MSG_DEP_SET to generate_messages(DEPENDENCIES ...)
 
 ## Generate messages in the 'msg' folder
-add_message_files(
-   FILES
-   WebUI.msg
-)
+#add_message_files(
+#   FILES
+#   WebUI.msg
+#)
 
 ## Generate services in the 'srv' folder
 # add_service_files(
@@ -66,10 +66,12 @@ add_message_files(
 # )
 
 ## Generate added messages and services with any dependencies listed here
-generate_messages(
-   DEPENDENCIES
-   std_msgs
- )
+#generate_messages(
+#   DEPENDENCIES
+#   std_msgs
+#   sensor_msgs
+#   dfkeggy_webui
+# )
 
 ###################################
 ## catkin specific configuration ##
@@ -82,7 +84,7 @@ generate_messages(
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
   INCLUDE_DIRS include
-  LIBRARIES dfkeggy_webui
+  LIBRARIES chauffeur
   CATKIN_DEPENDS roscpp std_msgs message_runtime
   DEPENDS system_lib
 )
@@ -99,19 +101,19 @@ include_directories(
 )
 
 ## Declare a cpp library
-# add_library(dfkeggy_webui
-#   src/${PROJECT_NAME}/dfkeggy_webui.cpp
+# add_library(chauffeur
+#   src/${PROJECT_NAME}/chauffeur.cpp
 # )
 
 ## Declare a cpp executable
-# add_executable(dfkeggy_webui_node src/dfkeggy_webui_node.cpp)
+# add_executable(chauffeur_node src/chauffeur_node.cpp)
 
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
-# add_dependencies(dfkeggy_webui_node dfkeggy_webui_generate_messages_cpp)
+# add_dependencies(chauffeur_node chauffeur_generate_messages_cpp)
 
 ## Specify libraries to link a library or executable target against
-# target_link_libraries(dfkeggy_webui_node
+# target_link_libraries(chauffeur_node
 #   ${catkin_LIBRARIES}
 # )
 
@@ -130,7 +132,7 @@ include_directories(
 # )
 
 ## Mark executables and/or libraries for installation
-# install(TARGETS dfkeggy_webui dfkeggy_webui_node
+# install(TARGETS chauffeur chauffeur_node
 #   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
 #   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
 #   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
@@ -155,7 +157,7 @@ include_directories(
 #############
 
 ## Add gtest based cpp test target and link libraries
-# catkin_add_gtest(${PROJECT_NAME}-test test/test_dfkeggy_webui.cpp)
+# catkin_add_gtest(${PROJECT_NAME}-test test/test_chauffeur.cpp)
 # if(TARGET ${PROJECT_NAME}-test)
 #   target_link_libraries(${PROJECT_NAME}-test ${PROJECT_NAME})
 # endif()
@@ -167,6 +169,6 @@ include_directories(
 # ---------------------------------------------------------
 include_directories(include ${catkin_INCLUDE_DIRS})
 
-add_executable(dfkeggy_webui src/server.cpp src/transform.cpp)
-target_link_libraries(dfkeggy_webui ${catkin_LIBRARIES} websockets)
-add_dependencies(dfkeggy_webui dfkeggy_webui_generate_messages_cpp) 
+add_executable(chauffeur src/chauffeur.cpp)
+target_link_libraries(chauffeur ${catkin_LIBRARIES})
+add_dependencies(chauffeur chauffeur_generate_messages_cpp) 

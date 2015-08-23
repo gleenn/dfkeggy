@@ -332,11 +332,12 @@
                 keggy.connected = true;
             };
             sock.onmessage =function(msg) {
+                var ROBOTEQ_CMD_MAX = 1000;
                 data = JSON.parse(msg.data);
                 keggy.active = data.active;
                 keggy.mode = data.mode;
-                keggy.vl = data.vl;
-                keggy.vr = data.vr;
+                keggy.vl = data.vl/ROBOTEQ_CMD_MAX;
+                keggy.vr = data.vr/ROBOTEQ_CMD_MAX;
                 keggy.goalX = data.goalX;
                 keggy.goalY = data.goalY;
                 keggy.goalTheta = data.goalTheta;
@@ -355,16 +356,7 @@
 
 	var transmit = function() {
 		if (sock) {
-            var msg;
-            if (mode == 'C') {
-                msg = [mode, vl, vr].join(':');
-            }
-            else if (mode == 'F') {
-                msg = [mode, goalX, goalY, goalTheta].join(':');
-            }
-            else {
-                msg = [mode].join(':');
-            }
+            var msg = [mode, vl, vr, goalX, goalY, goalTheta].join(':');
 			console.log('TX', msg);
 			sock.send(msg);
 		}
