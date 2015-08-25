@@ -1,4 +1,5 @@
 <launch>
     <node pkg="dfkeggy_webui" type="webui" name="webui_node" output="screen" respawn="true"/>
     <node pkg="dfkeggy_chauffeur" type="chauffeur" name="chauffeur_node" output="screen" respawn="true"/>
+    <node pkg="dfkeggy_simulator" type="simulator" name="simulator_node" output="screen" respawn="true"/>
 </launch>

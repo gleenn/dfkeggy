@@ -39,5 +39,6 @@ build/catkin_ws:
 	ln -s ../../../roboteq build/catkin_ws/src/roboteq
 	ln -s ../../../compass build/catkin_ws/src/compass
 	ln -s ../../../chauffeur build/catkin_ws/src/chauffeur
+	ln -s ../../../simulator build/catkin_ws/src/simulator
 	ln -s ../../../nmea_navsat_driver build/catkin_ws/src/nmea_navsat_driver
 
