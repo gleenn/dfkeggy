@@ -19,7 +19,7 @@ inline double from_degrees(double deg) {
 	return deg*M_PI*2/360;
 }
 
-const double ROBOTEQ_CMD_MAX = 500;
+const double ROBOTEQ_CMD_MAX = 100;
 const double ANGULAR_THRESHOLD = from_degrees(3);
 const double LINEAR_THRESHOLD = 5;
 
@@ -59,7 +59,7 @@ static void on_webui(const dfkeggy_webui::UIStatus::ConstPtr& msg) {
 				drive(1,-1);
 			} else if (theta < -ANGULAR_THRESHOLD) {
 				drive(-1, 1);
-			} else if (msg->goal_y < -LINEAR_THRESHOLD) {
+			} else if (msg->goal_y < -msg->goal_accuracy) {
 				drive(1,1);
 			} else {
 				drive(0,0); 

@@ -206,6 +206,8 @@
             baseWidth = 0.8,
             wheelRadius = 0.2,
             wheelWidth = 0.1,
+            location = null,
+            locationAccuracy = null,
             heading = 0,
             vl = 0,
             vr = 0,
@@ -254,7 +256,7 @@
                 d3.select(node)
                     .select('.goal text')
                     .attr('transform', 'translate(' + (winWidth/2) + ',' + (winHeight/2) + ')')
-                    .text(dist.toFixed(1) + ' m' );
+                    .text(dist.toFixed(0) + ' m ~ ' + goal.accuracy.toFixed(0));
             }
 
             // keggy
@@ -343,6 +345,12 @@
         Object.defineProperty(this, "goal", { 
             get : function () {return goal; },
         });
+        Object.defineProperty(this, "location", { 
+            get : function () {return location; },
+        });
+        Object.defineProperty(this, "locationAccuracy", { 
+            get : function () {return locationAccuracy; },
+        });
         Object.defineProperty(this, "active", { 
             get : function () { return d3.select('.controls').classed('active'); },
             set : function (v) { d3.select('.controls').classed('active', v); },
@@ -358,8 +366,13 @@
                 d3.select('.btn.mode-' + v.toLowerCase()).classed('selected', true);
             },
         });
-        this.setGoal = function(x, y, theta) {
-            goal = { x:x, y:y, theta:theta };
+        this.setGoal = function(x, y, theta, acc) {
+            goal = { x:x, y:y, theta:theta, accuracy: acc };
+            render();
+        }
+        this.setLocation = function(loc, acc) {
+            location = loc;
+            locationAccuracy = acc;
             render();
         }
 
@@ -382,8 +395,9 @@
                 goalX = d*Math.cos(b),
                 goalY = d*Math.sin(b),
                 goalTheta = b;
+                goalAccuracy = Math.max(keggy.locationAccuracy, deviceLocationAccuracy);
 
-            keggy.setGoal(goalX, goalY, goalTheta ); 
+            keggy.setGoal(goalX, goalY, goalTheta, goalAccuracy ); 
         }
     };
 
@@ -396,14 +410,14 @@
                 keggy.connected = true;
             };
             sock.onmessage =function(msg) {
-                var ROBOTEQ_CMD_MAX = 1000;
+                var ROBOTEQ_CMD_MAX = 100;
                 data = JSON.parse(msg.data);
                 keggy.active = data.active;
                 keggy.mode = data.mode;
                 keggy.vl = data.vl/ROBOTEQ_CMD_MAX;
                 keggy.vr = data.vr/ROBOTEQ_CMD_MAX;
                 keggy.heading = fromDegrees(data.heading);
-                keggy.location = data.location;
+                keggy.setLocation( data.location, data.locationAccuracy);
                 updateGoal();
             }; 
             sock.onclose = function() {
@@ -424,11 +438,12 @@
                 gx = keggy.goal.x;
                 gy = keggy.goal.y;
                 gt = keggy.goal.theta;
+                ga = keggy.goal.accuracy;
             }
             else {
-                gx = gy = gt = 0;
+                gx = gy = gt = ga = 0;
             }
-            var msg = [mode, vl, vr, gx, gy, gt].join(':');
+            var msg = [mode, vl, vr, gx, gy, gt, ga].join(':');
             //console.log('TX', msg);
             sock.send(msg);
         }

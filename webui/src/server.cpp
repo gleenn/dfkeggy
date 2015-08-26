@@ -73,6 +73,7 @@ struct ui_status_t {
 	double goalX;
 	double goalY;
 	double goalT;
+	double goalAccuracy;
 };
 
 ui_status_t ui_status;
@@ -80,9 +81,11 @@ keggy_status_t keggy_status;
 
 void handle(int cid, const char *msg) {
 	char mode;
-	if (sscanf(msg, "%c:%lf:%lf:%lf:%lf:%lf",
+	printf(">>> %s\n", msg);
+	if (sscanf(msg, "%c:%lf:%lf:%lf:%lf:%lf:%lf",
 	 	&ui_status.mode, &ui_status.cvl, &ui_status.cvr, 
-	 	&ui_status.goalX, &ui_status.goalY, &ui_status.goalT) == 6) {
+	 	&ui_status.goalX, &ui_status.goalY, &ui_status.goalT,
+	 	&ui_status.goalAccuracy) == 7) {
 		ui_status.controller_id = cid;
 		if (pub) {
 			dfkeggy_webui::UIStatus msg;
@@ -90,6 +93,7 @@ void handle(int cid, const char *msg) {
 			msg.goal_x = ui_status.goalX;
 			msg.goal_y = ui_status.goalY;
 			msg.goal_theta = ui_status.goalT;
+			msg.goal_accuracy = ui_status.goalAccuracy;
 			msg.v_left = ui_status.cvl;
 			msg.v_right = ui_status.cvr;
 			pub->publish(msg);
@@ -113,10 +117,10 @@ void handle(int cid, const char *msg) {
 }
 
 size_t format_status(int cid, char *buf) {
-	return sprintf(buf, "{\"active\":%d, \"mode\":\"%c\", \"vl\": %2.5lf, \"vr\": %2.5lf, \"location\": [%lf, %lf], \"heading\": %lf, \"goalX\":%lf, \"goalY\":%lf, \"goalTheta\":%f}", 
+	return sprintf(buf, "{\"active\":%d, \"mode\":\"%c\", \"vl\": %2.5lf, \"vr\": %2.5lf, \"location\": [%lf, %lf],  \"locationAccuracy\": %lf, \"heading\": %lf, \"goalX\":%lf, \"goalY\":%lf, \"goalTheta\":%f}", 
 		cid == ui_status.controller_id, ui_status.mode,
 		keggy_status.vl, keggy_status.vr,
-		keggy_status.lng, keggy_status.lat, keggy_status.heading,
+		keggy_status.lng, keggy_status.lat, keggy_status.locacc, keggy_status.heading,
 		ui_status.goalX, ui_status.goalY, ui_status.goalT);
 }
 

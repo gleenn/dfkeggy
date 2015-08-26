@@ -14,7 +14,7 @@ int main(int argc, char** argv) {
     ros::Publisher  gps_pub = ros_node.advertise<sensor_msgs::NavSatFix>("/gps_driver/fix", 1000);
     
     int i = 0;
-    double x = y = t = 0;
+    //double x = y = t = 0;
 
  	while(ros::ok()) {
 
